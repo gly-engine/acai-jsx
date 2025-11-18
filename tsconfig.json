@@ -1,0 +1,19 @@
+{
+  "$schema": "https://raw.githubusercontent.com/TypeScriptToLua/TypeScriptToLua/master/tsconfig-schema.json",
+  "include": ["src"],
+  "compilerOptions": {
+    "outDir": "build",
+    "jsx": "react",
+    "jsxFactory": "std.h",
+    "types": ["@gamely/gly-jsx"],
+    "strict": true
+  },
+  "tstl": {
+    "buildMode": "library",
+    "luaTarget": "universal",
+    "luaLibImport": "inline",
+    "noImplicitGlobalVariables": true,
+    "noImplicitSelf": true,
+    "noHeader": true,
+  }
+}

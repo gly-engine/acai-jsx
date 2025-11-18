@@ -1,0 +1,21 @@
+{
+  "name": "@gamely/acai-jsx",
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "build": "tstl",
+    "lint:fix": "eslint . --fix",
+    "lint": "eslint .",
+    "format:fix": "prettier --write .",
+    "format": "prettier --check ."
+  },
+  "devDependencies": {
+    "@gamely/gly-jsx": "^0.2.1",
+    "@gamely/gly-types": "^0.2.2",
+    "@typescript-eslint/eslint-plugin": "^8.39.1",
+    "@typescript-eslint/parser": "^8.39.1",
+    "eslint": "^9.33.0",
+    "typescript-eslint": "^8.39.1",
+    "typescript-to-lua": "^1.31.2"
+  }
+}

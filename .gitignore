@@ -1,0 +1,7 @@
+*.db
+*.lock
+*-lock.*
+dist/
+build/
+vendor/
+node_modules/
