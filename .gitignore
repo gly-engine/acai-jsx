@@ -1,7 +1,8 @@
 *.db
 *.lock
 *-lock.*
+*.lua
+*.d.ts
 dist/
-build/
 vendor/
 node_modules/
