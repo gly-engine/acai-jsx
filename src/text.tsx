@@ -132,7 +132,11 @@ export function Text(props: textProperties, std: GlyStd): JSX.Element {
 
     allLines.forEach((line) => {
       line.forEach((token) => {
-        self.tokens.push({ x: token.x, y: token.y + offsetY, word: token.word });
+        self.tokens.push({
+          x: token.x,
+          y: token.y + offsetY,
+          word: token.word,
+        });
       });
     });
   }
@@ -146,11 +150,17 @@ export function Text(props: textProperties, std: GlyStd): JSX.Element {
         self.label = value;
         self.flag = true;
       }) as GlyHandlerArgs);
-      std.bus.listen(props.listen_align!, ((value: NonNullable<textProperties["align"]>) => {
+      std.bus.listen(props.listen_align!, ((
+        value: NonNullable<textProperties["align"]>,
+      ) => {
         self.align = value;
         self.flag = true;
       }) as GlyHandlerArgs);
-      std.bus.listen(props.listen_font!, ((size?: number, name?: string, line_height?: number) => {
+      std.bus.listen(props.listen_font!, ((
+        size?: number,
+        name?: string,
+        line_height?: number,
+      ) => {
         self.font_size = size ?? self.font_size;
         self.line_size = line_height ?? props.line_height ?? self.font_size;
         self.font_name = name ?? self.font_name;
@@ -182,7 +192,9 @@ export function Text(props: textProperties, std: GlyStd): JSX.Element {
         self.flag = false;
       }
 
-      self.tokens.forEach((token) => std.text.print(token.x, token.y, token.word));
+      self.tokens.forEach((token) =>
+        std.text.print(token.x, token.y, token.word),
+      );
     },
   };
 }
