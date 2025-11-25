@@ -1,12 +1,20 @@
 import type { GlyStd, GlyApp } from "@gamely/gly-types";
 
-type rectProperties = { borderColor: number; backgroundColor?: number } | { borderColor?: number; backgroundColor: number };
+type rectProperties =
+  | { borderColor: number; backgroundColor?: number }
+  | { borderColor?: number; backgroundColor: number };
 
-type PngProperties = { src: string; center_x?: boolean; img_width?: number; center_y?: boolean; img_height?: number };
+type PngProperties = {
+  src: string;
+  center_x?: boolean;
+  img_width?: number;
+  center_y?: boolean;
+  img_height?: number;
+};
 
 export function Rect(props: rectProperties, std: GlyStd): JSX.Element {
   return {
-    draw: (self: GlyApp['data']) => {
+    draw: (self: GlyApp["data"]) => {
       if (props.backgroundColor !== undefined) {
         std.draw.color(props.backgroundColor);
         std.draw.rect(0, 0, 0, self.width, self.height);
@@ -21,7 +29,7 @@ export function Rect(props: rectProperties, std: GlyStd): JSX.Element {
 
 export function Png(props: PngProperties, std: GlyStd): JSX.Element {
   return {
-    draw: (self: GlyApp['data']) => {
+    draw: (self: GlyApp["data"]) => {
       let x = 0,
         y = 0;
       if (props.center_x !== undefined && props.img_width !== undefined) {
