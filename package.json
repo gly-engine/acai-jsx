@@ -2,6 +2,9 @@
   "name": "@gamely/acai-jsx",
   "version": "0.0.2",
   "type": "module",
+  "funding": "https://github.com/sponsors/RodrigoDornelles",
+  "repository": "https://github.com/gly-engine/acai-jsx",
+  "bugs": "https://github.com/gly-engine/acai-jsx/issues",
   "scripts": {
     "build": "tstl --declaration",
     "lint:fix": "eslint . --fix",
