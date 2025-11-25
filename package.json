@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "build": "tstl",
+    "build": "tstl --declaration",
     "lint:fix": "eslint . --fix",
     "lint": "eslint .",
     "format:fix": "prettier --write .",
