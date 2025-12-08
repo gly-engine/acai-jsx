@@ -39,8 +39,8 @@ export function Rect(props: AcaiRectProperties, std: GlyStd) {
 export type AcaiImageProperties =
   {
     src: (string) | (() => string);
-    align: ("left" | "center" | "right");
-    valign: ("top" | "middle" | "bottom");
+    align?: ("left" | "center" | "right");
+    valign?: ("top" | "middle" | "bottom");
     span?: number;
     offset?: number;
     after?: number;
@@ -60,8 +60,8 @@ export function Image(props: AcaiImageProperties, std: GlyStd) {
   const hasFixedSize = props.width !== undefined
   const mapH = { left: align1, center: align2, right: align3 }
   const mapV = { top: align1, middle: align2, bottom: align3 }
-  const align = mapH[props.align]
-  const valign = mapV[props.valign]
+  const align = mapH[props.align ?? "left"]
+  const valign = mapV[props.valign ?? "top"]
   const getSource = typeof src === 'string' ? () => src : src
 
   let cache = '';
