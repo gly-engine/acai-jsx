@@ -36,26 +36,64 @@ export function Rect(props: AcaiRectProperties, std: GlyStd) {
   );
 }
 
-export type PngProperties = {
-  src: string;
-  center_x?: boolean;
-  img_width?: number;
-  center_y?: boolean;
-  img_height?: number;
-};
+export type AcaiImageProperties =
+  {
+    src: (string) | (() => string);
+    align: ("left" | "center" | "right");
+    valign: ("top" | "middle" | "bottom");
+    span?: number;
+    offset?: number;
+    after?: number;
+    style?: string;
+  }
+  & (
+    | { width: number; height: number }
+    | { width?: never; height?: never }
+  );
 
-export function Png(props: PngProperties, std: GlyStd): JSX.Element {
-  return {
-    draw: (self: GlyApp["data"]) => {
-      let x = 0,
-        y = 0;
-      if (props.center_x !== undefined && props.img_width !== undefined) {
-        x = (self.width - props.img_width) / 2;
-      }
-      if (props.center_y !== undefined && props.img_height !== undefined) {
-        y = (self.height - props.img_height) / 2;
-      }
-      std.image.draw(props.src, x, y);
-    },
-  };
+const align1 = (_: number, _2: number) => 0
+const align2 = (child: number, parent: number) => (parent - child) / 2
+const align3 = (child: number, parent: number) => (parent - child)
+
+export function Image(props: AcaiImageProperties, std: GlyStd) {
+  const src = props.src
+  const hasFixedSize = props.width !== undefined
+  const mapH = { left: align1, center: align2, right: align3 }
+  const mapV = { top: align1, middle: align2, bottom: align3 }
+  const align = mapH[props.align]
+  const valign = mapV[props.valign]
+  const getSource = typeof src === 'string' ? () => src : src
+
+  let cache = '';
+  let width = props.width ?? 0;
+  let height = props.height ?? 0;
+
+  return (
+    <item
+      style={props.style}
+      after={props.after}
+      offset={props.offset}
+      span={props.span ?? 1}>
+      <node
+        draw={(self: GlyApp["data"]) => {
+          const source = getSource();
+
+          if (source.length === 0) return;
+
+          if (!hasFixedSize && cache !== source) {
+            if (!std.image.exists(source)) return;
+            height = std.image.mensure_height(source);
+            width = std.image.mensure_width(source);
+            cache = source;
+          }
+
+          if (source && width !== 0 && height !== 0) {
+            const x = align(width, self.width);
+            const y = valign(height, self.height);
+            std.image.draw(source, x, y);
+          }
+        }}
+      />
+    </item>
+  );
 }
