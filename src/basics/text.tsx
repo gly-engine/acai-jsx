@@ -10,6 +10,7 @@ export type AcaiTextBlockProperties =
     | { content?: never; children: string | (() => string) }
   ) & {
     color?: number | (() => number);
+    scroll?: number | (() => number);
     font_size?: number | (() => number);
     font_name?: string | (() => string);
     line_height?: number | (() => number);
@@ -175,6 +176,8 @@ export function AcaiGenerateTextTokens(
 }
 
 export function TextBlock(props: AcaiTextBlockProperties, std: GlyStd) {
+  const scroll = props.scroll ?? 0
+  const hasScroll = props.scroll !== undefined;
   const color = props.color ?? std.color.white;
   const content = props.children ?? props.content;
   const f_size = props.font_size ?? 12;
@@ -183,6 +186,7 @@ export function TextBlock(props: AcaiTextBlockProperties, std: GlyStd) {
   const ah = props.align ?? "center";
   const av = props.valign ?? "middle";
   const getColor = typeof color !== 'function' ? () => color : color;
+  const getScroll = typeof scroll !== 'function' ? () => scroll : scroll;
   const getContent = typeof content !== 'function' ? () => content : content;
   const getFontSize = typeof f_size !== 'function' ? () => f_size : f_size;
   const getFontName = typeof f_name !== 'function' ? () => f_name : f_name;
@@ -209,8 +213,10 @@ export function TextBlock(props: AcaiTextBlockProperties, std: GlyStd) {
       <node
         draw={(self: GlyApp["data"]) => {
           const text = getContent();
+          const roll = getScroll();
           const w = self.width
           const h = self.height
+          const h_mayabe = hasScroll? undefined: h
 
           if (text.length <= 0) return;
 
@@ -234,12 +240,15 @@ export function TextBlock(props: AcaiTextBlockProperties, std: GlyStd) {
             cacheAV = AV;
             cacheWidth = w;
             cacheHeight = h;
-            tokens = AcaiGenerateTextTokens(std, text, w, h, LH, AH, AV);
+            tokens = AcaiGenerateTextTokens(std, text, w, h_mayabe, LH, AH, AV);
           }
 
-          tokens.forEach((token) =>
-            std.text.print(token.x, token.y, token.word),
-          );
+          tokens.forEach((token) => {
+            const y = token.y + roll;
+            if (y > 0 && (y + LH) < w) {
+              std.text.print(token.x, y, token.word);
+            }
+          });
         }}
       />
     </item>
