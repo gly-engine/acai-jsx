@@ -36,6 +36,9 @@ export function Rect(props: AcaiRectProperties, std: GlyStd) {
   );
 }
 
+export type AlignImage = "left" | "right" | "center";
+export type AlignImageHorizontal = "top" | "middle" | "bottom";
+
 export type AcaiImageProperties =
   {
     src: (string) | (() => string);
