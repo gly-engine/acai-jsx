@@ -1,6 +1,6 @@
-import type { GlyStd, GlyHandlerArgs, GlyApp } from "@gamely/gly-types";
-/*
-export type AcaiBlockTextProperties =
+import type { GlyStd, GlyApp } from "@gamely/gly-types";
+
+export type AcaiTextBlockProperties =
   (
     | { content: string | (() => string); children?: never }
     | { content?: never; children: string | (() => string) }
@@ -11,64 +11,79 @@ export type AcaiBlockTextProperties =
     line_height?: number | (() => number);
     align?: ("left" | "right" | "justify" | "center") | (() => "left" | "right" | "justify" | "center");
     valign?: ("top" | "middle" | "bottom") | (() => "top" | "middle" | "bottom");
+  } & {
+    span?: number;
+    offset?: number;
+    after?: number;
+    style?: string;
   };
 
-type textToken = {
+export type AcaiTextToken = {
   x: number;
   y: number;
+  w: number;
+  h: number;
   word: string;
 };
 
-type textRequiredFields = an
-  flag: boolean;
-  width: number;
-  height: number;
-  label: NonNullable<textProperties["label"]>;
-  color: NonNullable<textProperties["color"]>;
-  align: NonNullable<textProperties["align"]>;
-  valign: NonNullable<textProperties["valign"]>;
-  line_size: NonNullable<textProperties["line_height"]>;
-  font_size: NonNullable<textProperties["font_size"]>;
-  font_name: textProperties["font_name"];
-  tokens: Array<textToken>;
-};
+export function AcaiGenerateTextTokens(
+  std: GlyStd,
+  text: string,
+  size: number,
+  lh: number,
+  ah: "left" | "right" | "justify" | "center",
+  av: "top" | "middle" | "bottom"
+) {
+  const tokens: Array<AcaiTextToken> = [];
 
-function recalculateText(self: textRequiredFields, std: GlyStd) {
-  self.tokens = [];
+  const words = text.split(" ");
 
-  const spaceSize = std.text.mensure(" ") as unknown as number;
-  const lineHeight = self.line_size;
-
-  const words = self.label.split(" ");
+  const spaceSize = std.text.mensure_width(" ");
+  const lineHeight = lh;
 
   let y = 0;
-  let lineWords: { word: string; width: number }[] = [];
+  let lineWords: { word: string; width: number; height: number }[] = [];
   let lineWidth = 0;
 
-  const allLines: textToken[][] = [];
+  const allLines: {
+    x: number;
+    y: number;
+    word: string;
+    w: number;
+    h: number;
+  }[][] = [];
 
   function commitLine(isLast: boolean) {
     if (lineWords.length === 0) return;
 
-    if (y + lineHeight > self.height) {
-      lineWords = [];
-      return;
-    }
+    const lineTokens: {
+      x: number;
+      y: number;
+      word: string;
+      w: number;
+      h: number;
+    }[] = [];
 
-    const lineTokens: textToken[] = [];
     let offsetX = 0;
 
-    if (self.align === "center") {
-      offsetX = (self.width - lineWidth) / 2;
-    } else if (self.align === "right") {
-      offsetX = self.width - lineWidth;
-    } else if (self.align === "justify" && lineWords.length > 1) {
-      if (isLast && lineWidth < self.width * 0.7) {
-        offsetX = 0;
+    if (ah === "center") {
+      offsetX = (size - lineWidth) / 2;
+    } else if (ah === "right") {
+      offsetX = size - lineWidth;
+    } else if (ah === "justify" && lineWords.length > 1) {
+      if (isLast && lineWidth < size * 0.7) {
+        let x = 0;
         lineWords.forEach((lw) => {
-          lineTokens.push({ x: offsetX, y, word: lw.word });
-          offsetX += lw.width + spaceSize;
+          lineTokens.push({
+            x,
+            y,
+            word: lw.word,
+            w: lw.width,
+            h: lw.height
+          });
+          x += lw.width + spaceSize;
         });
+
         allLines.push(lineTokens);
         y += lineHeight;
         lineWords = [];
@@ -77,13 +92,22 @@ function recalculateText(self: textRequiredFields, std: GlyStd) {
       }
 
       const totalSpaces = lineWords.length - 1;
-      const extraSpace = (self.width - lineWidth) / totalSpaces;
-      let curX = 0;
+      const extraSpace = (size - lineWidth) / totalSpaces;
+
+      let x = 0;
       lineWords.forEach((lw, idx) => {
-        lineTokens.push({ x: curX, y, word: lw.word });
-        curX += lw.width;
-        if (idx < totalSpaces) curX += spaceSize + extraSpace;
+        lineTokens.push({
+          x,
+          y,
+          word: lw.word,
+          w: lw.width,
+          h: lw.height
+        });
+
+        x += lw.width;
+        if (idx < totalSpaces) x += spaceSize + extraSpace;
       });
+
       allLines.push(lineTokens);
       y += lineHeight;
       lineWords = [];
@@ -92,7 +116,13 @@ function recalculateText(self: textRequiredFields, std: GlyStd) {
     }
 
     lineWords.forEach((lw) => {
-      lineTokens.push({ x: offsetX, y, word: lw.word });
+      lineTokens.push({
+        x: offsetX,
+        y,
+        word: lw.word,
+        w: lw.width,
+        h: lw.height
+      });
       offsetX += lw.width + spaceSize;
     });
 
@@ -104,104 +134,110 @@ function recalculateText(self: textRequiredFields, std: GlyStd) {
 
   for (let i = 0; i < words.length; i++) {
     const word = words[i];
-    const width = std.text.mensure(word) as unknown as number;
+    const width = std.text.mensure_width(word);
+    const height = std.text.mensure_width(word);
+
     const isLastWord = i === words.length - 1;
 
-    if (lineWidth > 0 && lineWidth + spaceSize + width > self.width) {
+    if (lineWidth > 0 && lineWidth + spaceSize + width > size) {
       commitLine(false);
-      if (y + lineHeight > self.height) break;
     }
 
-    lineWords.push({ word, width });
+    lineWords.push({ word, width, height });
     lineWidth += (lineWidth > 0 ? spaceSize : 0) + width;
 
-    if (isLastWord) {
-      commitLine(true);
-    }
+    if (isLastWord) commitLine(true);
   }
 
   const totalTextHeight = allLines.length * lineHeight;
   let offsetY = 0;
-  if (self.valign === "middle") {
-    offsetY = (self.height - totalTextHeight) / 2;
-  } else if (self.valign === "bottom") {
-    offsetY = self.height - totalTextHeight;
-  }
+
+  if (av === "middle") offsetY = (size - totalTextHeight) / 2;
+  else if (av === "bottom") offsetY = size - totalTextHeight;
 
   allLines.forEach((line) => {
-    line.forEach((token) => {
-      self.tokens.push({
-        x: token.x,
-        y: token.y + offsetY,
-        word: token.word,
+    line.forEach((t) => {
+      tokens.push({
+        x: t.x,
+        y: t.y + offsetY,
+        word: t.word,
+        w: t.w,
+        h: t.h
       });
     });
   });
+
+  return tokens;
 }
 
-export function TextBlock(props: AcaiBlockTextProperties, std: GlyStd): JSX.Element {
+export function TextBlock(props: AcaiTextBlockProperties, std: GlyStd) {
+  const color = props.color ?? std.color.white;
+  const content = props.children ?? props.content;
+  const f_size = props.font_size ?? 12;
+  const f_name = props.font_name ?? "";
+  const lh = props.line_height ?? f_size;
+  const ah = props.align ?? "center";
+  const av = props.valign ?? "middle";
+  const getColor = typeof color !== 'function' ? () => color : color;
+  const getContent = typeof content !== 'function' ? () => content : content;
+  const getFontSize = typeof f_size !== 'function' ? () => f_size : f_size;
+  const getFontName = typeof f_name !== 'function' ? () => f_name : f_name;
+  const getLineHeight = typeof lh !== 'function' ? () => lh : lh;
+  const getAlignH = typeof ah !== 'function' ? () => ah : ah;
+  const getAlignV = typeof av !== 'function' ? () => av : av;
 
+  let cacheText = '';
+  let cacheFontSize = getFontSize();
+  let cacheFontName = getFontName();
+  let cacheLH = getLineHeight();
+  let cacheAH = getAlignH();
+  let cacheAV = getAlignV();
+  let tokens: Array<AcaiTextToken>;
 
-  return {
-    load: (self: textRequiredFields) => {
-      std.bus.listen(props.listen_color!, ((value: number) => {
-        self.color = value;
-      }) as GlyHandlerArgs);
-      std.bus.listen(props.listen_label!, ((value: string) => {
-        self.label = value;
-        self.flag = true;
-      }) as GlyHandlerArgs);
-      std.bus.listen(props.listen_align!, ((
-        value: NonNullable<textProperties["align"]>,
-      ) => {
-        self.align = value;
-        self.flag = true;
-      }) as GlyHandlerArgs);
-      std.bus.listen(props.listen_font!, ((
-        size?: number,
-        name?: string,
-        line_height?: number,
-      ) => {
-        self.font_size = size ?? self.font_size;
-        self.line_size = line_height ?? props.line_height ?? self.font_size;
-        self.font_name = name ?? self.font_name;
-        self.flag = true;
-      }) as GlyHandlerArgs);
+  return (
+    <item
+      style={props.style}
+      after={props.after}
+      offset={props.offset}
+      span={props.span ?? 1}>
+      <node
+        draw={(self: GlyApp["data"]) => {
+          const text = getContent();
 
-      self.font_size = props.font_size!;
-      self.line_size = props.line_height ?? self.font_size;
-      self.font_name = props.font_name;
-      self.color = props.color ?? std.color.white;
-      self.align = props.align ?? "left";
-      self.valign = props.valign ?? "top";
-      self.label = props.label!;
-      self.tokens = [];
-      self.flag = true;
-    },
-    draw: (self: textRequiredFields) => {
-      if (!self.label || (!self.font_size && !self.color)) return;
+          if (text.length <= 0) return;
 
-      if (self.font_name !== undefined) {
-        std.text.font_name(self.font_name);
-      }
+          const fontSize = getFontSize();
+          const fontName = getFontName();
+          const lineHeight = getLineHeight();
+          const alignH = getAlignH();
+          const AlignV = getAlignV();
 
-      std.text.font_size(self.font_size);
-      std.draw.color(self.color);
+          if (text != cacheText || fontSize != cacheFontSize || fontName != cacheFontName
+            || lineHeight != cacheLH || alignH != cacheAH || AlignV != cacheAV) {
+            cacheText = text;
+            cacheFontSize = fontSize;
+            cacheFontName = fontName;
+            cacheLH = lineHeight;
+            cacheAH = alignH;
+            cacheAV = AlignV;
+            tokens = AcaiGenerateTextTokens(std, text, fontSize, lineHeight, alignH, AlignV);
+          }
 
-      if (self.flag) {
-        recalculateText(self);
-        self.flag = false;
-      }
+          if (fontName.length > 0) std.text.font_name(fontName);
 
-      self.tokens.forEach((token) =>
-        std.text.print(token.x, token.y, token.word),
-      );
-    },
-  };
+          std.text.font_size(fontSize);
+          std.draw.color(getColor());
+
+          tokens.forEach((token) =>
+            std.text.print(token.x, token.y, token.word),
+          );
+        }}
+      />
+    </item>
+  );
 }
-*/
 
-export type AcaTextProperties =
+export type AcaiTextProperties =
   (
     | { content: string | (() => string); children?: never }
     | { content?: never; children: string | (() => string) }
@@ -218,7 +254,8 @@ export type AcaTextProperties =
     style?: string;
   };
 
-export function Text(props: AcaTextProperties, std: GlyStd) {
+
+export function Text(props: AcaiTextProperties, std: GlyStd) {
   const mapH = { left: -1, center: 0, right: 1 }
   const mapV = { top: -1, middle: 0, bottom: 1 }
   const color = props.color ?? std.color.white
@@ -242,17 +279,21 @@ export function Text(props: AcaTextProperties, std: GlyStd) {
       span={props.span ?? 1}>
       <node
         draw={(self: GlyApp["data"]) => {
-          const text = getContent()
-          const font = getFontName()
-          let x = 0, y = 0, h = getAlignH(), v = getAlignV()
+          const text = getContent();
+          const font = getFontName();
+
+          if (text.length < 0) return;
+          if (font.length > 0) std.text.font_name(font);
+
+          let x = 0, y = 0, h = getAlignH(), v = getAlignV();
 
           if (h === 0) x = self.width / 2;
           if (h === 1) x = self.width;
           if (v === 0) y = self.height / 2;
           if (v === 1) y = self.height;
-          if (font.length > 0) std.text.font_name(font);
-          std.text.font_size(getFontSize())
-          std.draw.color(getColor())
+
+          std.text.font_size(getFontSize());
+          std.draw.color(getColor());
 
           std.text.print_ex(x, y, text, h, v);
         }}
