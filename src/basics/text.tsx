@@ -1,5 +1,9 @@
 import type { GlyStd, GlyApp } from "@gamely/gly-types";
 
+export type AlignText = "left" | "right" | "justify" | "center";
+export type AlignTextSimple = "left" | "right" | "center";
+export type AlignTextHorizontal = "top" | "middle" | "bottom";
+
 export type AcaiTextBlockProperties =
   (
     | { content: string | (() => string); children?: never }
@@ -29,134 +33,134 @@ export type AcaiTextToken = {
 export function AcaiGenerateTextTokens(
   std: GlyStd,
   text: string,
-  size: number,
+  width: number,
+  height: number | undefined,
   lh: number,
   ah: "left" | "right" | "justify" | "center",
   av: "top" | "middle" | "bottom"
 ) {
-  const tokens: Array<AcaiTextToken> = [];
-
+  const tokens: AcaiTextToken[] = [];
   const words = text.split(" ");
-
   const spaceSize = std.text.mensure_width(" ");
-  const lineHeight = lh;
-
   let y = 0;
+
   let lineWords: { word: string; width: number; height: number }[] = [];
   let lineWidth = 0;
-
-  const allLines: {
-    x: number;
-    y: number;
-    word: string;
-    w: number;
-    h: number;
-  }[][] = [];
+  const lines: AcaiTextToken[][] = [];
 
   function commitLine(isLast: boolean) {
     if (lineWords.length === 0) return;
 
-    const lineTokens: {
-      x: number;
-      y: number;
-      word: string;
-      w: number;
-      h: number;
-    }[] = [];
-
+    const lineTokens: AcaiTextToken[] = [];
     let offsetX = 0;
 
-    if (ah === "center") {
-      offsetX = (size - lineWidth) / 2;
-    } else if (ah === "right") {
-      offsetX = size - lineWidth;
-    } else if (ah === "justify" && lineWords.length > 1) {
-      if (isLast && lineWidth < size * 0.7) {
-        let x = 0;
-        lineWords.forEach((lw) => {
-          lineTokens.push({
-            x,
-            y,
-            word: lw.word,
-            w: lw.width,
-            h: lw.height
-          });
-          x += lw.width + spaceSize;
-        });
-
-        allLines.push(lineTokens);
-        y += lineHeight;
-        lineWords = [];
-        lineWidth = 0;
-        return;
-      }
-
+    if (ah === "center") offsetX = (width - lineWidth) / 2;
+    else if (ah === "right") offsetX = width - lineWidth;
+    else if (ah === "justify" && lineWords.length > 1 && !(isLast && lineWidth < width * 0.7)) {
       const totalSpaces = lineWords.length - 1;
-      const extraSpace = (size - lineWidth) / totalSpaces;
-
+      const extraSpace = (width - lineWidth) / totalSpaces;
       let x = 0;
       lineWords.forEach((lw, idx) => {
-        lineTokens.push({
-          x,
-          y,
-          word: lw.word,
-          w: lw.width,
-          h: lw.height
-        });
-
+        lineTokens.push({ x, y, word: lw.word, w: lw.width, h: lw.height });
         x += lw.width;
         if (idx < totalSpaces) x += spaceSize + extraSpace;
       });
-
-      allLines.push(lineTokens);
-      y += lineHeight;
+      lines.push(lineTokens);
+      y += lh;
       lineWords = [];
       lineWidth = 0;
       return;
     }
 
-    lineWords.forEach((lw) => {
-      lineTokens.push({
-        x: offsetX,
-        y,
-        word: lw.word,
-        w: lw.width,
-        h: lw.height
-      });
+    lineWords.forEach(lw => {
+      lineTokens.push({ x: offsetX, y, word: lw.word, w: lw.width, h: lw.height });
       offsetX += lw.width + spaceSize;
     });
 
-    allLines.push(lineTokens);
-    y += lineHeight;
+    lines.push(lineTokens);
+    y += lh;
     lineWords = [];
     lineWidth = 0;
   }
 
+  function replaceLastWordWithEllipsis() {
+    const dots = "...";
+    const w = std.text.mensure_width(dots);
+    const lastLine = lines.at(-1);
+    if (!lastLine) return;
+
+    const last = lastLine[lastLine.length - 1];
+    const oldWidth = last.w;
+    last.word = dots;
+    last.w = w;
+
+    if (ah === "right") {
+      let newLineWidth = lastLine.reduce((acc, t, idx) => {
+        if (idx > 0) acc += spaceSize;
+        return acc + t.w;
+      }, 0);
+
+      let x = width - newLineWidth;
+      lastLine.forEach((t, idx) => {
+        t.x = x;
+        x += t.w + spaceSize;
+      });
+    } else if (ah === "center") {
+      let newLineWidth = lastLine.reduce((acc, t, idx) => {
+        if (idx > 0) acc += spaceSize;
+        return acc + t.w;
+      }, 0);
+
+      let x = (width - newLineWidth) / 2;
+      lastLine.forEach((t, idx) => {
+        t.x = x;
+        x += t.w + spaceSize;
+      });
+    }
+  }
+
   for (let i = 0; i < words.length; i++) {
-    const word = words[i];
-    const width = std.text.mensure_width(word);
-    const height = std.text.mensure_width(word);
+    const w = std.text.mensure_width(words[i]);
+    const h = lh;
 
-    const isLastWord = i === words.length - 1;
+    const nextLineOverflow = lineWidth > 0 && lineWidth + spaceSize + w > width;
 
-    if (lineWidth > 0 && lineWidth + spaceSize + width > size) {
+    if (nextLineOverflow) {
+      const nextY = y + lh;
+
+      if (height !== undefined && nextY > height) {
+        commitLine(true);
+        replaceLastWordWithEllipsis();
+        return lines.flat();
+      }
+
       commitLine(false);
     }
 
-    lineWords.push({ word, width, height });
-    lineWidth += (lineWidth > 0 ? spaceSize : 0) + width;
-
-    if (isLastWord) commitLine(true);
+    lineWords.push({ word: words[i], width: w, height: h });
+    lineWidth += (lineWidth > 0 ? spaceSize : 0) + w;
   }
 
-  const totalTextHeight = allLines.length * lineHeight;
+  const nextY = y + lh;
+
+  if (height !== undefined && nextY > height) {
+    commitLine(true);
+    replaceLastWordWithEllipsis();
+    return lines.flat();
+  }
+
+  commitLine(true);
+
+  const totalTextHeight = lines.length * lh;
   let offsetY = 0;
 
-  if (av === "middle") offsetY = (size - totalTextHeight) / 2;
-  else if (av === "bottom") offsetY = size - totalTextHeight;
+  if (height !== undefined) {
+    if (av === "middle") offsetY = (height - totalTextHeight) / 2;
+    else if (av === "bottom") offsetY = height - totalTextHeight;
+  }
 
-  allLines.forEach((line) => {
-    line.forEach((t) => {
+  lines.forEach(line => {
+    line.forEach(t => {
       tokens.push({
         x: t.x,
         y: t.y + offsetY,
@@ -186,12 +190,14 @@ export function TextBlock(props: AcaiTextBlockProperties, std: GlyStd) {
   const getAlignH = typeof ah !== 'function' ? () => ah : ah;
   const getAlignV = typeof av !== 'function' ? () => av : av;
 
-  let cacheText = '';
+  let cacheText = getContent();
   let cacheFontSize = getFontSize();
   let cacheFontName = getFontName();
   let cacheLH = getLineHeight();
   let cacheAH = getAlignH();
   let cacheAV = getAlignV();
+  let cacheWidth = 0;
+  let cacheHeight = 0;
   let tokens: Array<AcaiTextToken>;
 
   return (
@@ -203,30 +209,33 @@ export function TextBlock(props: AcaiTextBlockProperties, std: GlyStd) {
       <node
         draw={(self: GlyApp["data"]) => {
           const text = getContent();
+          const w = self.width
+          const h = self.height
 
           if (text.length <= 0) return;
 
           const fontSize = getFontSize();
           const fontName = getFontName();
-          const lineHeight = getLineHeight();
-          const alignH = getAlignH();
-          const AlignV = getAlignV();
+          const LH = getLineHeight();
+          const AH = getAlignH();
+          const AV = getAlignV();
+
+          if (fontName.length > 0) std.text.font_name(fontName);
+          std.text.font_size(fontSize);
+          std.draw.color(getColor());
 
           if (text != cacheText || fontSize != cacheFontSize || fontName != cacheFontName
-            || lineHeight != cacheLH || alignH != cacheAH || AlignV != cacheAV) {
+            || LH != cacheLH || AH != cacheAH || AV != cacheAV || w != cacheWidth || h != cacheHeight) {
             cacheText = text;
             cacheFontSize = fontSize;
             cacheFontName = fontName;
-            cacheLH = lineHeight;
-            cacheAH = alignH;
-            cacheAV = AlignV;
-            tokens = AcaiGenerateTextTokens(std, text, fontSize, lineHeight, alignH, AlignV);
+            cacheLH = LH;
+            cacheAH = AH;
+            cacheAV = AV;
+            cacheWidth = w;
+            cacheHeight = h;
+            tokens = AcaiGenerateTextTokens(std, text, w, h, LH, AH, AV);
           }
-
-          if (fontName.length > 0) std.text.font_name(fontName);
-
-          std.text.font_size(fontSize);
-          std.draw.color(getColor());
 
           tokens.forEach((token) =>
             std.text.print(token.x, token.y, token.word),
