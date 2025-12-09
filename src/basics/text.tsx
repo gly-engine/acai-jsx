@@ -271,14 +271,18 @@ export function Text(props: AcaiTextProperties, std: GlyStd) {
   const content = props.children ?? props.content
   const f_size = props.font_size ?? 12
   const f_name = props.font_name ?? ""
-  const ah = props.align ?? mapH["center"]
-  const av = props.valign ?? mapV["middle"]
+  const ah = props.align
+  const av = props.valign
+  const ah_is_function = typeof ah === 'function'
+  const av_is_function = typeof av === 'function'
+  const ah_value = (!ah_is_function && ah !== undefined? mapH[ah]: 0)
+  const av_value = (!av_is_function && av !== undefined? mapV[av]: 0)
   const getColor = typeof color !== 'function' ? () => color : color
   const getContent = typeof content !== 'function' ? () => content : content
   const getFontSize = typeof f_size !== 'function' ? () => f_size : f_size
   const getFontName = typeof f_name !== 'function' ? () => f_name : f_name
-  const getAlignH = (typeof ah !== 'function' ? () => ah : (() => mapH[ah()])) as (() => -1 | 0 | 1)
-  const getAlignV = (typeof av !== 'function' ? () => av : (() => mapV[av()])) as (() => -1 | 0 | 1)
+  const getAlignH = !ah_is_function? () => ah_value : (() => mapH[ah()])
+  const getAlignV = !av_is_function? () => av_value : (() => mapV[av()])
 
   return (
     <item
@@ -304,7 +308,7 @@ export function Text(props: AcaiTextProperties, std: GlyStd) {
           std.text.font_size(getFontSize());
           std.draw.color(getColor());
 
-          std.text.print_ex(x, y, text, h, v);
+          std.text.print_ex(x, y, text, h as 0, v as 0);
         }}
       />
     </item>
