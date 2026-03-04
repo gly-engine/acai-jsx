@@ -317,7 +317,7 @@ export function Text(props: AcaiTextProperties, std: GlyStd) {
           std.text.font_size(getFontSize());
           std.draw.color(getColor());
 
-          std.text.print_ex(x, y, text, h as 0, v as 0);
+          std.text.print_ex(x, y, text, -h as 0, -v as 0);
         }}
       />
     </item>
