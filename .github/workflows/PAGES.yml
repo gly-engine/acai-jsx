@@ -1,0 +1,38 @@
+name: pages
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  doxygen:
+    runs-on: ubuntu-latest
+    steps:
+      - 
+        uses: actions/checkout@master
+      - 
+        run: |
+          npm install
+      - 
+        run: |
+          npm run build:sample
+      - 
+        uses: actions/configure-pages@v4
+      - 
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist/web
+      - 
+        id: deployment
+        uses: actions/deploy-pages@v4
