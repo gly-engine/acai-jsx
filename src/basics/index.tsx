@@ -5,14 +5,17 @@ export type AcaiRectProperties =
     | { borderColor: number | (() => number); backgroundColor?: number | (() => number) }
     | { borderColor?: number | (() => number); backgroundColor: number | (() => number) }
   )
+  & { radius?: number | (() => number) }
   & { span?: number, offset?: number, after?: number, style?: string }
   ;
 
 export function Rect(props: AcaiRectProperties, std: GlyStd) {
   const c0 = props.backgroundColor;
   const c1 = props.borderColor;
+  const r = props.radius ?? 0;
   const getColor0 = typeof c0 === 'number' ? () => c0 : c0
   const getColor1 = typeof c1 === 'number' ? () => c1 : c1
+  const getRadius = typeof r === 'number'? () => r: r
 
   return (
     <item
@@ -24,11 +27,11 @@ export function Rect(props: AcaiRectProperties, std: GlyStd) {
         draw={(self: GlyApp["data"]) => {
           if (getColor0 !== undefined) {
             std.draw.color(getColor0());
-            std.draw.rect(0, 0, 0, self.width, self.height);
+            (std.draw.rect2 || std.draw.rect)(0, 0, 0, self.width, self.height, getRadius());
           }
           if (getColor1 !== undefined) {
             std.draw.color(getColor1());
-            std.draw.rect(1, 0, 0, self.width, self.height);
+            (std.draw.rect2 || std.draw.rect)(1, 0, 0, self.width, self.height, getRadius());
           }
         }}
       />
