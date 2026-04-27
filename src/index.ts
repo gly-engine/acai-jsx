@@ -1,3 +1,3 @@
+export { request } from "./runtime"
 export { createState } from "./hooks"
-export { Rect, Image } from "./basics"
-export { Text, TextBlock } from "./basics/text"
+export { Rect, Image, Text, TextBlock } from "./basics"
