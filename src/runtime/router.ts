@@ -1,5 +1,4 @@
 import type { GlyApp, GlyStd } from "@gamely/gly-types";
-import { createState } from "../hooks/state";
 
 export type AcaiRouterInternalString = '@error' | '@error/not-found' | '@splash';
 export type AcaiRouterString = `/${string}`;
@@ -46,7 +45,7 @@ type State<T extends PagesMap> = {
   currentApp?: GlyApp;
   stack: Entry<T>[];
   getErrorText: (this: void) => string;
-  setErrorText: (this: void, s: string) => void;
+  errorText: string;
 };
 
 type Router<T extends PagesMap> = {
@@ -163,7 +162,7 @@ async function mount<T extends PagesMap>(s: State<T>, entry: Entry<T>): Promise<
 }
 
 function handleError<T extends PagesMap>(s: State<T>, err: unknown): void {
-  s.setErrorText(String(err));
+  s.errorText = String(err);
 
   const route: AcaiRouterInternalString =
     err instanceof NotFoundError ? '@error/not-found' : '@error';
@@ -297,16 +296,13 @@ function configure<T extends PagesMap>(s: State<T>, config: RouterConfig): void 
 export function createRouter<
   T extends { [K in keyof T]: K extends `/${string}` ? AcaiRouterPage<any> : never } = AcaiRouterEndpoints
 >(): [Router<T>, SetRouter] {
-  const [_getErrorText, _setErrorText] = createState("Error!");
-  const getErrorText = () => _getErrorText();
-  const setErrorText = (v: string) => _setErrorText(v);
   const s: State<T> = {
     stack: [],
     userPages: {} as Partial<T>,
     internalPages: {},
     internalApps: {},
-    getErrorText,
-    setErrorText,
+    errorText: '',
+    getErrorText: () => s.errorText
   };
 
   const instance: Router<T> = {
