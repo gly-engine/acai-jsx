@@ -8,7 +8,7 @@ export type AcaiRouterPage<T = {}> = (props: T, std: GlyStd) =>
   | Promise<JSX.Element>
   | AsyncGenerator<JSX.Element, JSX.Element | void, unknown>;
 
-export type AcaiRouterPageError = (props: {getMessage: () => string}, std: GlyStd) => JSX.Element
+export type AcaiRouterPageError = (props: {getMessage: (this: void) => string}, std: GlyStd) => JSX.Element
 export type AcaiRouterPageSplash = (props: {}, std: GlyStd) => JSX.Element
 export type AcaiRouterEndpoints<P = any> = Record<AcaiRouterString, AcaiRouterPage<P>>;
 
@@ -79,7 +79,6 @@ class NotFoundError extends Error {
     this.name = 'NotFoundError';
   }
 }
-
 
 const isThenable = (v: unknown): v is Promise<unknown> => {
   const maybe = v as { then?: unknown };

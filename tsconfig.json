@@ -15,7 +15,7 @@
   "tstl": {
     "buildMode": "library",
     "luaTarget": "universal",
-    "luaLibImport": "inline",
+    "luaLibImport": "require-minimal",
     "noImplicitGlobalVariables": true,
     "noImplicitSelf": true,
     "noHeader": true
