@@ -6,8 +6,10 @@
   "repository": "https://github.com/gly-engine/acai-jsx",
   "bugs": "https://github.com/gly-engine/acai-jsx/issues",
   "scripts": {
-    "prebuild:sample": "npm run build",
-    "build:sample": "gly-cli build-html --cwd dist sample/index.lua --outdir dist/web",
+    "prebuild:sample:basic": "npm run build",
+    "build:sample:basic": "gly-cli build-html --cwd dist samples/basic/index.lua --outdir dist/web",
+    "prebuild:sample:router": "npm run build",
+    "build:sample:router": "gly-cli build-html --cwd dist samples/router/index.lua --outdir dist/web",
     "postbuild": "cp README.md package.json tsconfig.json dist/src",
     "build": "tstl --declaration",
     "lint:fix": "eslint . --fix",
@@ -22,8 +24,11 @@
     "@typescript-eslint/eslint-plugin": "^8.39.1",
     "@typescript-eslint/parser": "^8.39.1",
     "eslint": "^9.33.0",
+    "prettier": "^3.6.2",
     "typescript-eslint": "^8.39.1",
-    "typescript-to-lua": "^1.31.2",
-    "prettier": "^3.6.2"
+    "typescript-to-lua": "^1.31.2"
+  },
+  "dependencies": {
+    "@typescript-to-lua/language-extensions": "^1.19.0"
   }
 }

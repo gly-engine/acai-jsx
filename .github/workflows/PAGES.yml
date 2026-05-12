@@ -26,7 +26,7 @@ jobs:
           npm install
       - 
         run: |
-          npm run build:sample
+          npm run build:sample:basic
       - 
         uses: actions/configure-pages@v4
       - 

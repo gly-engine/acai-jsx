@@ -1,12 +1,15 @@
 {
   "$schema": "https://raw.githubusercontent.com/TypeScriptToLua/TypeScriptToLua/master/tsconfig-schema.json",
-  "include": ["src", "sample"],
+  "include": ["src", "samples"],
   "compilerOptions": {
     "lib": ["es2022"],
     "outDir": "dist",
     "jsx": "react",
     "jsxFactory": "std.h",
-    "types": ["@gamely/gly-jsx"],
+    "types": [
+      "@gamely/gly-jsx",
+      "@typescript-to-lua/language-extensions"
+    ],
     "strict": true
   },
   "tstl": {

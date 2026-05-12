@@ -1,5 +1,5 @@
 import type { GlyStd } from '@gamely/gly-types';
-import { createState, Rect, Text, TextBlock } from '../src';
+import { createState, Rect, Text, TextBlock } from '../../src';
 
 export const meta = {
   title: 'Acai JSX Sample',
