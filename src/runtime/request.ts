@@ -75,15 +75,13 @@ function factoryRequest(getConfig: AcaiHttpGetConfigs, method: AcaiHttpMethod) {
             if (typeof opts?.body === 'object') http.body(opts.body);
 
             const toResponse = (s: GlyStdWithHttpResponse, ok: boolean) => {
-                // @ts-ignore
-                const json_decode = std.json?.decode || JSON?.parse || (() => { throw new Error("json not required!") });
                 const status = s.http.status ?? 0;
                 const raw = s.http.body as string;
 
                 return {
                     ok, status,
                     text: () => raw,
-                    json: <T>() => json_decode(raw) as T,
+                    json: <T>() => std.json?.decode(raw) as T,
                 };
             };
 
