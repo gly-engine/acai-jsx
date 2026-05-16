@@ -2,7 +2,7 @@ import type { GlyApp, GlyStd } from "@gamely/gly-types";
 
 export type AcaiRouterInternalString = '@error' | '@error/not-found' | '@splash';
 export type AcaiRouterString = `/${string}`;
-export type AcaiRouterPageStep = JSX.Element | ((this: void) => Promise<void>);
+export type AcaiRouterPageStep = JSX.Element | ((this: void) => Promise<JSX.Element | void>);
 export type AcaiRouterPage<T = {}> = (props: T, std: GlyStd) =>
   | JSX.Element
   | Promise<JSX.Element>
@@ -215,7 +215,8 @@ async function mount<T extends PagesMap>(
       }
       const value = step.value;
       if (typeof value === 'function') {
-        await value();
+        const ret = await value();
+        if (ret !== undefined) mountStep(ret);
       } else {
         mountStep(value);
       }
