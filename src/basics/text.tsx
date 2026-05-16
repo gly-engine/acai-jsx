@@ -42,7 +42,7 @@ export function AcaiGenerateTextTokens(
 ) {
   const tokens: AcaiTextToken[] = [];
   const words = text.split(" ");
-  const spaceSize = std.text.mensure_width(" ");
+  const spaceSize = std.text.mensure_width("a");
   let y = 0;
 
   let lineWords: { word: string; width: number; height: number }[] = [];
