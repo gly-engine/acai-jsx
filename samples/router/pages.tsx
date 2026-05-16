@@ -24,7 +24,6 @@ export function PageA(props: {}, std: GlyStd) {
 }
 
 export function PageB(props: {}, std: GlyStd) {
-    //throw new Error('erro')
     return <node>
         <Rect backgroundColor={std.color.green} />
         <Text>Page: B</Text>
@@ -32,7 +31,6 @@ export function PageB(props: {}, std: GlyStd) {
 }
 
 export async function PageC(props: {}, std: GlyStd) {
-    //await request(std).get('/')
     await sleep(1000);
 
     return <node>
@@ -41,20 +39,20 @@ export async function PageC(props: {}, std: GlyStd) {
     </node>
 }
 
-export async function* PageD(props: {}, std: GlyStd) {
+export function* PageD(props: {}, std: GlyStd) {
     yield <node>
         <Rect backgroundColor={std.color.yellow} />
         <Text>Page: D (1)</Text>
     </node>
 
-    await sleep(500);
+    yield async () => await sleep(500);
 
     yield <node>
         <Rect backgroundColor={std.color.orange} />
         <Text>Page: D (2)</Text>
     </node>
 
-    await sleep(500);
+    yield async () => await sleep(500);
 
     return <node>
         <Rect backgroundColor={std.color.red} />

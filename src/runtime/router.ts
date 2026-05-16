@@ -2,10 +2,11 @@ import type { GlyApp, GlyStd } from "@gamely/gly-types";
 
 export type AcaiRouterInternalString = '@error' | '@error/not-found' | '@splash';
 export type AcaiRouterString = `/${string}`;
+export type AcaiRouterPageStep = JSX.Element | ((this: void) => Promise<void>);
 export type AcaiRouterPage<T = {}> = (props: T, std: GlyStd) =>
   | JSX.Element
   | Promise<JSX.Element>
-  | AsyncGenerator<JSX.Element, JSX.Element | void, unknown>;
+  | Generator<AcaiRouterPageStep, JSX.Element | void, void>;
 
 export type AcaiRouterPageError = (this: void, props: {getMessage: (this: void) => string}, std: GlyStd) => JSX.Element
 export type AcaiRouterPageSplash = (this: void, props: {}, std: GlyStd) => JSX.Element
@@ -102,10 +103,13 @@ const isThenable = (v: unknown): v is Promise<unknown> => {
 const resolve = async <X>(v: X | Promise<X>): Promise<X> =>
   isThenable(v) ? await v : v;
 
-const isAsyncGenerator = (
+const isPageGenerator = (
   v: unknown,
-): v is AsyncGenerator<JSX.Element, JSX.Element | void, unknown> =>
-  v != null && typeof v === "object" && typeof (v as { next?: unknown }).next === "function";
+): v is Generator<AcaiRouterPageStep, JSX.Element | void, void> =>
+  v != null
+  && typeof v === "object"
+  && typeof (v as { next?: unknown }).next === "function"
+  && typeof (v as { [Symbol.iterator]?: unknown })[Symbol.iterator] === "function";
 
 const spawnTop = <T extends PagesMap>(s: State<T>, el: JSX.Element): GlyApp =>
   s.std!.node.spawn(el);
@@ -188,18 +192,33 @@ async function mount<T extends PagesMap>(
 
   const result = fn(entry.params, s.std!);
 
-  if (isAsyncGenerator(result)) {
-    const first = await result.next();
-    if (first.done) return;
+  if (isPageGenerator(result)) {
+    let firstMount = true;
+    const mountStep = (el: JSX.Element): void => {
+      if (firstMount) {
+        killCurrent(s);
+        s.currentApp = spawnInRoot(s, el);
+        if (s.internalApps['@splash']) s.std!.node.pause(s.internalApps['@splash']!);
+        firstMount = false;
+      } else {
+        const prev = s.currentApp;
+        s.currentApp = spawnInRoot(s, el);
+        if (prev) s.std!.node.kill(prev);
+      }
+    };
 
-    killCurrent(s);
-    s.currentApp = spawnInRoot(s, first.value);
-    if (s.internalApps['@splash']) s.std!.node.pause(s.internalApps['@splash']!);
-
-    for await (const element of result) {
-      const prev = s.currentApp;
-      s.currentApp = spawnInRoot(s, element);
-      if (prev != undefined) s.std!.node.kill(prev);
+    while (true) {
+      const step = result.next();
+      if (step.done) {
+        if (step.value !== undefined) mountStep(step.value);
+        break;
+      }
+      const value = step.value;
+      if (typeof value === 'function') {
+        await value();
+      } else {
+        mountStep(value);
+      }
     }
   } else {
     killCurrent(s);
