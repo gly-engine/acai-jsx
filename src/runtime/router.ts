@@ -210,15 +210,15 @@ async function mount<T extends PagesMap>(
     while (true) {
       const step = result.next();
       if (step.done) {
-        if (step.value !== undefined) mountStep(step.value);
+        if (step.value !== undefined) mountStep(step.value as JSX.Element);
         break;
       }
       const value = step.value;
       if (typeof value === 'function') {
         const ret = await value();
-        if (ret !== undefined) mountStep(ret);
+        if (ret !== undefined) mountStep(ret as JSX.Element);
       } else {
-        mountStep(value);
+        mountStep(value as JSX.Element);
       }
     }
   } else {
