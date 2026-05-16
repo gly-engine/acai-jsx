@@ -22,7 +22,16 @@ type PagesMap = Record<string, AcaiRouterPage<any>>;
 type PagePath<T extends PagesMap> = keyof T & string;
 type PageProps<T extends PagesMap, K extends keyof T> =
   T[K] extends (props: infer P, std: GlyStd) => unknown ? P : never;
-type Entry<T extends PagesMap> = { path: PagePath<T>; params: PageParams };
+type Entry<T extends PagesMap> = {
+  path: PagePath<T>;
+  params: PageParams;
+  focusedId?: string;
+};
+
+type FocusTarget = 'first' | `#${string}` | `.${string}`;
+type FocusTargetMemo = FocusTarget | 'last';
+type FocusOption = FocusTarget | FocusTarget[];
+type FocusMemoOption = FocusTargetMemo | FocusTargetMemo[];
 
 type Nav<T extends PagesMap> = <K extends PagePath<T>>(
   this: void,
@@ -33,11 +42,17 @@ type Nav<T extends PagesMap> = <K extends PagePath<T>>(
 type RouterConfig = {
   std: GlyStd;
   unload_images?: boolean;
+  focus_first?: FocusOption;
+  focus_back?: FocusMemoOption;
+  focus_home?: FocusMemoOption;
 };
 
 type State<T extends PagesMap> = {
   std?: GlyStd;
   unload_images?: boolean;
+  focus_first: FocusTarget[];
+  focus_back: FocusTargetMemo[];
+  focus_home: FocusTargetMemo[];
   userPages: Partial<T>;
   internalPages: InternalPages;
   internalApps: Partial<Record<AcaiRouterInternalString, GlyApp>>;
@@ -98,6 +113,11 @@ const spawnTop = <T extends PagesMap>(s: State<T>, el: JSX.Element): GlyApp =>
 const spawnInRoot = <T extends PagesMap>(s: State<T>, el: any): GlyApp =>
   (s.std!.node.spawn as any)(el, s.rootApp) as GlyApp;
 
+function toFocusArray<X extends string>(v: X | X[] | undefined): X[] {
+  if (v === undefined) return [];
+  return typeof v === 'string' ? [v] : v;
+}
+
 const killCurrent = <T extends PagesMap>(s: State<T>): void => {
   if (s.currentApp) {
     s.std!.node.kill(s.currentApp);
@@ -115,7 +135,34 @@ function resolveInternalRoute<T extends PagesMap>(
   return undefined;
 }
 
-async function mount<T extends PagesMap>(s: State<T>, entry: Entry<T>): Promise<void> {
+function applyFocus<T extends PagesMap>(
+  s: State<T>,
+  entry: Entry<T>,
+  targets: FocusTargetMemo[],
+): void {
+  if (!s.std) return;
+  for (const target of targets) {
+    if (target === 'last') {
+      if (!entry.focusedId) continue;
+      s.std.ui.focus(`#${entry.focusedId}`);
+    } else {
+      s.std.ui.focus(target);
+    }
+    if (s.std.ui.queryOne('focused')) return;
+  }
+}
+
+function rememberFocus<T extends PagesMap>(s: State<T>): void {
+  if (!s.std || s.stack.length === 0) return;
+  const top = s.stack[s.stack.length - 1];
+  top.focusedId = s.std.ui.queryOne('focused')?.getId();
+}
+
+async function mount<T extends PagesMap>(
+  s: State<T>,
+  entry: Entry<T>,
+  focus: FocusTargetMemo[],
+): Promise<void> {
   const fn = s.userPages[entry.path] as AcaiRouterPage<any> | undefined;
   if (!fn) throw new NotFoundError(entry.path);
 
@@ -159,6 +206,8 @@ async function mount<T extends PagesMap>(s: State<T>, entry: Entry<T>): Promise<
     s.currentApp = spawnInRoot(s, await resolve(result));
     if (s.internalApps['@splash']) s.std!.node.pause(s.internalApps['@splash']!);
   }
+
+  applyFocus(s, entry, focus);
 }
 
 function handleError<T extends PagesMap>(s: State<T>, err: unknown): void {
@@ -177,10 +226,12 @@ function handleError<T extends PagesMap>(s: State<T>, err: unknown): void {
 async function navigate<T extends PagesMap>(
   s: State<T>,
   op: () => Entry<T> | undefined,
+  focus: FocusTargetMemo[],
 ): Promise<void> {
   try {
+    rememberFocus(s);
     const next = op();
-    if (next) await mount(s, next);
+    if (next) await mount(s, next, focus);
   } catch (e) {
     handleError(s, e);
   }
@@ -193,6 +244,7 @@ function go<T extends PagesMap, K extends PagePath<T>>(
     const i = s.stack.findIndex(e => e.path === path);
     const entry: Entry<T> = { path, params: params as PageParams };
     if (i >= 0) {
+      entry.focusedId = s.stack[i].focusedId;
       s.stack.splice(i + 1);
       s.stack[i] = entry;
     } else {
@@ -200,7 +252,7 @@ function go<T extends PagesMap, K extends PagePath<T>>(
       if (s.stack.length > STACK_CAP) s.stack.shift();
     }
     return entry;
-  });
+  }, s.focus_first);
 }
 
 function back<T extends PagesMap>(s: State<T>): Promise<void> {
@@ -208,7 +260,7 @@ function back<T extends PagesMap>(s: State<T>): Promise<void> {
     if (s.stack.length <= 1) return undefined;
     s.stack.pop();
     return s.stack[s.stack.length - 1];
-  });
+  }, s.focus_back);
 }
 
 function home<T extends PagesMap>(s: State<T>): Promise<void> {
@@ -216,7 +268,7 @@ function home<T extends PagesMap>(s: State<T>): Promise<void> {
     if (s.stack.length <= 1) return undefined;
     s.stack.splice(1);
     return s.stack[0];
-  });
+  }, s.focus_home);
 }
 
 function replace<T extends PagesMap, K extends PagePath<T>>(
@@ -227,7 +279,7 @@ function replace<T extends PagesMap, K extends PagePath<T>>(
     if (s.stack.length === 0) s.stack.push(entry);
     else s.stack[s.stack.length - 1] = entry;
     return entry;
-  });
+  }, s.focus_first);
 }
 
 function reset<T extends PagesMap, K extends PagePath<T>>(
@@ -238,7 +290,7 @@ function reset<T extends PagesMap, K extends PagePath<T>>(
     s.stack.length = 0;
     s.stack.push(entry);
     return entry;
-  });
+  }, s.focus_first);
 }
 
 function registerInternalPage<T extends PagesMap>(
@@ -285,6 +337,9 @@ function configure<T extends PagesMap>(s: State<T>, config: RouterConfig): void 
 
   s.std = config.std;
   s.unload_images = config.unload_images;
+  s.focus_first = toFocusArray(config.focus_first);
+  s.focus_back = toFocusArray(config.focus_back);
+  s.focus_home = toFocusArray(config.focus_home);
   s.rootApp = config.std.node.spawn(config.std.node.load({}));
   s.internalPages = {};
   s.internalApps = {};
@@ -301,6 +356,9 @@ export function createRouter<
     userPages: {} as Partial<T>,
     internalPages: {},
     internalApps: {},
+    focus_first: [],
+    focus_back: [],
+    focus_home: [],
     errorText: '',
     getErrorText: () => s.errorText
   };
