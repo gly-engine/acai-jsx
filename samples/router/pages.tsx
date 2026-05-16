@@ -59,3 +59,23 @@ export function* PageD(props: {}, std: GlyStd) {
         <Text>Page: D (3)</Text>
     </node>
 }
+
+export function* PageE(props: {}, std: GlyStd) {
+    yield <node>
+        <Rect backgroundColor={std.color.yellow} />
+        <Text>Page: D (1)</Text>
+    </node>
+
+    yield async () => {
+        await sleep(500);
+        return <node>
+            <Rect backgroundColor={std.color.orange} />
+            <Text>Page: D (2)</Text>
+        </node>;
+    };
+
+    return <node>
+        <Rect backgroundColor={std.color.red} />
+        <Text>Page: D (3)</Text>
+    </node>
+}

@@ -241,6 +241,7 @@ function handleError<T extends PagesMap>(s: State<T>, err: unknown): void {
   const resolved = resolveInternalRoute(s, route);
   const app = resolved ? s.internalApps[resolved] : undefined;
   if (app) s.std!.node.resume(app);
+  killCurrent(s);
 }
 
 async function navigate<T extends PagesMap>(

@@ -16,14 +16,13 @@ export const config = {
 export const callbacks = {
     load: (_: never, std: GlyStd) => {
         loadRuntime(std, Pages, ErrorPage, PageLoading);
-        //goToPage('/a', {}).then();
+        goToPage('/a', {})
     },
     key: (_: never, std: GlyStd) => {
-        // @ts-ignore
-        //print('key', std.key.press.c, std.key.press.any)
         if (std.key.press.a) goToPage('/a', {})
         if (std.key.press.b) goToPage('/b', {})
         if (std.key.press.c) goToPage('/c', {})
         if (std.key.press.d) goToPage('/d', {})
+        if (std.key.press.up) goToPage('/e', {})
     }
 }
