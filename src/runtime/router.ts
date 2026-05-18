@@ -46,6 +46,7 @@ type RouterConfig = {
   focus_seek?: FocusOption;
   focus_back?: FocusMemoOption;
   focus_home?: FocusMemoOption;
+  focus_error?: FocusOption;
 };
 
 type State<T extends PagesMap> = {
@@ -54,6 +55,7 @@ type State<T extends PagesMap> = {
   focus_seek: FocusTarget[];
   focus_back: FocusTargetMemo[];
   focus_home: FocusTargetMemo[];
+  focus_error: FocusTarget[];
   userPages: Partial<T>;
   internalPages: InternalPages;
   internalApps: Partial<Record<AcaiRouterInternalString, GlyApp>>;
@@ -146,13 +148,10 @@ function applyFocus<T extends PagesMap>(
 ): void {
   if (!s.std) return;
   for (const target of targets) {
-    if (target === 'last') {
-      if (!entry.focusedId) continue;
-      s.std.ui.focus(`#${entry.focusedId}`);
-    } else {
-      s.std.ui.focus(target);
-    }
-    if (s.std.ui.queryOne('focused')) return;
+    const focused = target === 'last'
+      ? (entry.focusedId ? s.std.ui.focus(`#${entry.focusedId}`) : undefined)
+      : s.std.ui.focus(target);
+    if (focused) return;
   }
 }
 
@@ -246,6 +245,11 @@ function handleError<T extends PagesMap>(s: State<T>, err: unknown): void {
   const app = resolved ? s.internalApps[resolved] : undefined;
   if (app) s.std!.node.resume(app);
   killCurrent(s);
+
+  if (app && s.focus_error.length > 0) {
+    const errorEntry: Entry<T> = { path: '' as PagePath<T>, params: {} };
+    applyFocus(s, errorEntry, s.focus_error);
+  }
 }
 
 async function navigate<T extends PagesMap>(
@@ -362,9 +366,10 @@ function configure<T extends PagesMap>(s: State<T>, config: RouterConfig): void 
 
   s.std = config.std;
   s.unload_images = config.unload_images;
-  s.focus_seek = toFocusArray(config.focus_seek);
-  s.focus_back = toFocusArray(config.focus_back);
-  s.focus_home = toFocusArray(config.focus_home);
+  s.focus_seek  = toFocusArray(config.focus_seek);
+  s.focus_back  = toFocusArray(config.focus_back);
+  s.focus_home  = toFocusArray(config.focus_home);
+  s.focus_error = toFocusArray(config.focus_error);
   s.rootApp = config.std.node.spawn(config.std.node.load({}));
   s.internalPages = {};
   s.internalApps = {};
@@ -384,6 +389,7 @@ export function createRouter<
     focus_seek: [],
     focus_back: [],
     focus_home: [],
+    focus_error: [],
     errorText: '',
     getErrorText: () => s.errorText
   };
