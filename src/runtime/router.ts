@@ -43,7 +43,7 @@ type Nav<T extends PagesMap> = <K extends PagePath<T>>(
 type RouterConfig = {
   std: GlyStd;
   unload_images?: boolean;
-  focus_first?: FocusOption;
+  focus_seek?: FocusOption;
   focus_back?: FocusMemoOption;
   focus_home?: FocusMemoOption;
 };
@@ -51,7 +51,7 @@ type RouterConfig = {
 type State<T extends PagesMap> = {
   std?: GlyStd;
   unload_images?: boolean;
-  focus_first: FocusTarget[];
+  focus_seek: FocusTarget[];
   focus_back: FocusTargetMemo[];
   focus_home: FocusTargetMemo[];
   userPages: Partial<T>;
@@ -277,7 +277,7 @@ function go<T extends PagesMap, K extends PagePath<T>>(
       if (s.stack.length > STACK_CAP) s.stack.shift();
     }
     return entry;
-  }, s.focus_first);
+  }, s.focus_seek);
 }
 
 function back<T extends PagesMap>(s: State<T>): Promise<void> {
@@ -304,7 +304,7 @@ function replace<T extends PagesMap, K extends PagePath<T>>(
     if (s.stack.length === 0) s.stack.push(entry);
     else s.stack[s.stack.length - 1] = entry;
     return entry;
-  }, s.focus_first);
+  }, s.focus_seek);
 }
 
 function reset<T extends PagesMap, K extends PagePath<T>>(
@@ -315,7 +315,7 @@ function reset<T extends PagesMap, K extends PagePath<T>>(
     s.stack.length = 0;
     s.stack.push(entry);
     return entry;
-  }, s.focus_first);
+  }, s.focus_seek);
 }
 
 function registerInternalPage<T extends PagesMap>(
@@ -362,7 +362,7 @@ function configure<T extends PagesMap>(s: State<T>, config: RouterConfig): void 
 
   s.std = config.std;
   s.unload_images = config.unload_images;
-  s.focus_first = toFocusArray(config.focus_first);
+  s.focus_seek = toFocusArray(config.focus_seek);
   s.focus_back = toFocusArray(config.focus_back);
   s.focus_home = toFocusArray(config.focus_home);
   s.rootApp = config.std.node.spawn(config.std.node.load({}));
@@ -381,7 +381,7 @@ export function createRouter<
     userPages: {} as Partial<T>,
     internalPages: {},
     internalApps: {},
-    focus_first: [],
+    focus_seek: [],
     focus_back: [],
     focus_home: [],
     errorText: '',
