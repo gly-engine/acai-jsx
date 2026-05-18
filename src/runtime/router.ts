@@ -190,6 +190,10 @@ async function mount<T extends PagesMap>(
     if (s.internalApps[route]) s.std!.node.pause(s.internalApps[route]!);
   }
 
+  if (s.unload_images) {
+    s.std!.image.unload_all();
+  }
+
   const result = fn(entry.params, s.std!);
 
   if (isPageGenerator(result)) {
