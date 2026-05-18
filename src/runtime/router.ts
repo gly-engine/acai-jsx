@@ -151,7 +151,7 @@ function applyFocus<T extends PagesMap>(
     const focused = target === 'last'
       ? (entry.focusedId ? s.std.ui.focus(`#${entry.focusedId}`) : undefined)
       : s.std.ui.focus(target);
-    if (focused) return;
+    if (focused !== undefined) return;
   }
 }
 
