@@ -47,6 +47,8 @@ type RouterConfig = {
   focus_back?: FocusMemoOption;
   focus_home?: FocusMemoOption;
   focus_error?: FocusOption;
+  same_page?: 'block' | 'reload';
+  interrupt?: 'block';
 };
 
 type State<T extends PagesMap> = {
@@ -56,6 +58,9 @@ type State<T extends PagesMap> = {
   focus_back: FocusTargetMemo[];
   focus_home: FocusTargetMemo[];
   focus_error: FocusTarget[];
+  same_page: 'block' | 'reload';
+  interrupt?: 'block';
+  busy: boolean;
   userPages: Partial<T>;
   internalPages: InternalPages;
   internalApps: Partial<Record<AcaiRouterInternalString, GlyApp>>;
@@ -256,13 +261,22 @@ async function navigate<T extends PagesMap>(
   s: State<T>,
   op: () => Entry<T> | undefined,
   focus: FocusTargetMemo[],
+  targetPath?: string,
 ): Promise<void> {
+  if (s.interrupt === 'block' && s.busy) return;
+  if (s.same_page === 'block' && targetPath !== undefined) {
+    const top = s.stack[s.stack.length - 1];
+    if (top && top.path === targetPath) return;
+  }
+  s.busy = true;
   try {
     rememberFocus(s);
     const next = op();
     if (next) await mount(s, next, focus);
+    s.busy = false;
   } catch (e) {
     handleError(s, e);
+    s.busy = false;
   }
 }
 
@@ -281,7 +295,7 @@ function go<T extends PagesMap, K extends PagePath<T>>(
       if (s.stack.length > STACK_CAP) s.stack.shift();
     }
     return entry;
-  }, s.focus_seek);
+  }, s.focus_seek, path);
 }
 
 function back<T extends PagesMap>(s: State<T>): Promise<void> {
@@ -308,7 +322,7 @@ function replace<T extends PagesMap, K extends PagePath<T>>(
     if (s.stack.length === 0) s.stack.push(entry);
     else s.stack[s.stack.length - 1] = entry;
     return entry;
-  }, s.focus_seek);
+  }, s.focus_seek, path);
 }
 
 function reset<T extends PagesMap, K extends PagePath<T>>(
@@ -319,7 +333,7 @@ function reset<T extends PagesMap, K extends PagePath<T>>(
     s.stack.length = 0;
     s.stack.push(entry);
     return entry;
-  }, s.focus_seek);
+  }, s.focus_seek, path);
 }
 
 function registerInternalPage<T extends PagesMap>(
@@ -370,6 +384,9 @@ function configure<T extends PagesMap>(s: State<T>, config: RouterConfig): void 
   s.focus_back  = toFocusArray(config.focus_back);
   s.focus_home  = toFocusArray(config.focus_home);
   s.focus_error = toFocusArray(config.focus_error);
+  s.same_page = config.same_page ?? 'reload';
+  s.interrupt = config.interrupt;
+  s.busy = false;
   s.rootApp = config.std.node.spawn(config.std.node.load({}));
   s.internalPages = {};
   s.internalApps = {};
@@ -390,6 +407,8 @@ export function createRouter<
     focus_back: [],
     focus_home: [],
     focus_error: [],
+    same_page: 'reload',
+    busy: false,
     errorText: '',
     getErrorText: () => s.errorText
   };
