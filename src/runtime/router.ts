@@ -10,6 +10,7 @@ export type AcaiRouterPage<T = {}> = (props: T, std: GlyStd) =>
 
 export type AcaiRouterPageError = (this: void, props: {getMessage: (this: void) => string}, std: GlyStd) => JSX.Element
 export type AcaiRouterPageSplash = (this: void, props: {}, std: GlyStd) => JSX.Element
+export type AcaiRouterPageUnmount<P = any> = (this: void, props: P, std: GlyStd) => Generator<AcaiRouterPageStep, void, void>;
 export type AcaiRouterEndpoints<P = any> = Record<AcaiRouterString, AcaiRouterPage<P>>;
 
 type Primitive = string | number | boolean | undefined;
@@ -62,6 +63,7 @@ type State<T extends PagesMap> = {
   interrupt?: 'block';
   busy: boolean;
   userPages: Partial<T>;
+  userUnmounts: Partial<Record<string, AcaiRouterPageUnmount>>;
   internalPages: InternalPages;
   internalApps: Partial<Record<AcaiRouterInternalString, GlyApp>>;
   rootApp?: GlyApp;
@@ -81,8 +83,11 @@ type Router<T extends PagesMap> = {
   current: (this: void) => PagePath<T> | undefined;
   register(path: '@error' | '@error/not-found', fn: AcaiRouterPageError): void;
   register(path: '@splash', fn: AcaiRouterPageSplash): void;
-  register<K extends PagePath<T>, P extends PageProps<T, K>>(path: K, fn: AcaiRouterPage<P>): void;
-  registerAll(pages: { [K in PagePath<T>]?: AcaiRouterPage<PageProps<T, K>> }): void;
+  register<K extends PagePath<T>, P extends PageProps<T, K>>(path: K, fn: AcaiRouterPage<P>, unmount?: AcaiRouterPageUnmount<P>): void;
+  registerAll(
+    pages: { [K in PagePath<T>]?: AcaiRouterPage<PageProps<T, K>> },
+    unmounts?: { [K in PagePath<T>]?: AcaiRouterPageUnmount<PageProps<T, K>> },
+  ): void;
   unregister(path: AcaiRouterInternalString | PagePath<T>): void;
 };
 
@@ -238,6 +243,30 @@ async function mount<T extends PagesMap>(
   applyFocus(s, entry, focus);
 }
 
+async function runUnmount<T extends PagesMap>(
+  s: State<T>,
+  unmount: AcaiRouterPageUnmount,
+  props: PageParams,
+): Promise<void> {
+  const gen = unmount(props, s.std!);
+  const swap = (el: JSX.Element): void => {
+    const prev = s.currentApp;
+    s.currentApp = spawnInRoot(s, el);
+    if (prev) s.std!.node.kill(prev);
+  };
+  while (true) {
+    const step = gen.next();
+    if (step.done) break;
+    const value = step.value;
+    if (typeof value === 'function') {
+      const ret = await value();
+      if (ret !== undefined) swap(ret as JSX.Element);
+    } else {
+      swap(value as JSX.Element);
+    }
+  }
+}
+
 function handleError<T extends PagesMap>(s: State<T>, err: unknown): void {
   s.errorText = String(err);
 
@@ -271,8 +300,15 @@ async function navigate<T extends PagesMap>(
   s.busy = true;
   try {
     rememberFocus(s);
+    const currentEntry = s.stack[s.stack.length - 1];
     const next = op();
-    if (next) await mount(s, next, focus);
+    if (next) {
+      if (currentEntry) {
+        const unmountFn = s.userUnmounts[currentEntry.path];
+        if (unmountFn) await runUnmount(s, unmountFn, currentEntry.params);
+      }
+      await mount(s, next, focus);
+    }
     s.busy = false;
   } catch (e) {
     handleError(s, e);
@@ -352,8 +388,14 @@ function registerUserPage<T extends PagesMap, K extends PagePath<T>>(
   s: State<T>,
   path: K,
   fn: T[K],
+  unmount?: AcaiRouterPageUnmount,
 ): void {
   s.userPages[path] = fn;
+  if (unmount !== undefined) {
+    s.userUnmounts[path] = unmount;
+  } else {
+    delete s.userUnmounts[path];
+  }
 }
 
 function unregisterPage<T extends PagesMap>(
@@ -369,6 +411,7 @@ function unregisterPage<T extends PagesMap>(
     }
   } else {
     delete (s.userPages as Partial<Record<string, AcaiRouterPage<any>>>)[path];
+    delete s.userUnmounts[path];
   }
 }
 
@@ -391,6 +434,7 @@ function configure<T extends PagesMap>(s: State<T>, config: RouterConfig): void 
   s.internalPages = {};
   s.internalApps = {};
   s.userPages = {} as Partial<T>;
+  s.userUnmounts = {};
   s.currentApp = undefined;
   s.stack.length = 0;
 }
@@ -401,6 +445,7 @@ export function createRouter<
   const s: State<T> = {
     stack: [],
     userPages: {} as Partial<T>,
+    userUnmounts: {},
     internalPages: {},
     internalApps: {},
     focus_seek: [],
@@ -421,14 +466,21 @@ export function createRouter<
     home: () => home(s),
     error: (err) => handleError(s, err),
     current: () => s.stack[s.stack.length - 1]?.path,
-    register: ((path: AcaiRouterInternalString | PagePath<T>, fn: AcaiRouterPageError | AcaiRouterPageSplash | T[PagePath<T>]) => {
+    register: ((
+      path: AcaiRouterInternalString | PagePath<T>,
+      fn: AcaiRouterPageError | AcaiRouterPageSplash | T[PagePath<T>],
+      unmount?: AcaiRouterPageUnmount,
+    ) => {
       if (INTERNAL_KEYS.has(path)) {
         registerInternalPage(s, path as AcaiRouterInternalString, fn as AcaiRouterPageError | AcaiRouterPageSplash);
       } else {
-        registerUserPage(s, path as PagePath<T>, fn as T[PagePath<T>]);
+        registerUserPage(s, path as PagePath<T>, fn as T[PagePath<T>], unmount);
       }
     }) as Router<T>['register'],
-    registerAll: (pages) => { Object.assign(s.userPages, pages); },
+    registerAll: (pages, unmounts) => {
+      Object.assign(s.userPages, pages);
+      if (unmounts) Object.assign(s.userUnmounts, unmounts);
+    },
     unregister: (path) => unregisterPage(s, path),
   };
 
