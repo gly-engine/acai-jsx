@@ -42,7 +42,7 @@ type Nav<T extends PagesMap> = <K extends PagePath<T>>(
 ) => Promise<void>;
 
 type RouterConfig = {
-  std: GlyStd;
+  std?: GlyStd;
   unload_images?: boolean;
   focus_seek?: FocusOption;
   focus_back?: FocusMemoOption;
@@ -50,6 +50,7 @@ type RouterConfig = {
   focus_error?: FocusOption;
   same_page?: 'block' | 'reload';
   interrupt?: 'block';
+  lock?: boolean;
 };
 
 type State<T extends PagesMap> = {
@@ -61,6 +62,7 @@ type State<T extends PagesMap> = {
   focus_error: FocusTarget[];
   same_page: 'block' | 'reload';
   interrupt?: 'block';
+  lock: boolean;
   busy: boolean;
   userPages: Partial<T>;
   userUnmounts: Partial<Record<string, AcaiRouterPageUnmount>>;
@@ -292,6 +294,7 @@ async function navigate<T extends PagesMap>(
   focus: FocusTargetMemo[],
   targetPath?: string,
 ): Promise<void> {
+  if (s.lock) return;
   if (s.interrupt === 'block' && s.busy) return;
   if (s.same_page === 'block' && targetPath !== undefined) {
     const top = s.stack[s.stack.length - 1];
@@ -416,27 +419,29 @@ function unregisterPage<T extends PagesMap>(
 }
 
 function configure<T extends PagesMap>(s: State<T>, config: RouterConfig): void {
-  for (const key of Object.keys(s.internalApps) as AcaiRouterInternalString[]) {
-    if (s.internalApps[key]) s.std?.node.kill(s.internalApps[key]!);
-  }
-  if (s.currentApp) s.std?.node.kill(s.currentApp);
+  if (config.std !== undefined) {
+    for (const key of Object.keys(s.internalApps) as AcaiRouterInternalString[]) {
+      if (s.internalApps[key]) s.std?.node.kill(s.internalApps[key]!);
+    }
+    if (s.currentApp) s.std?.node.kill(s.currentApp);
+    if (s.rootApp) s.std?.node.kill(s.rootApp);
 
-  s.std = config.std;
-  s.unload_images = config.unload_images;
-  s.focus_seek  = toFocusArray(config.focus_seek);
-  s.focus_back  = toFocusArray(config.focus_back);
-  s.focus_home  = toFocusArray(config.focus_home);
-  s.focus_error = toFocusArray(config.focus_error);
-  s.same_page = config.same_page ?? 'reload';
-  s.interrupt = config.interrupt;
-  s.busy = false;
-  s.rootApp = config.std.node.spawn(config.std.node.load({}));
-  s.internalPages = {};
-  s.internalApps = {};
-  s.userPages = {} as Partial<T>;
-  s.userUnmounts = {};
-  s.currentApp = undefined;
-  s.stack.length = 0;
+    s.std = config.std;
+    s.rootApp = config.std.node.spawn(config.std.node.load({}));
+    s.internalApps = {};
+    s.currentApp = undefined;
+    s.busy = false;
+    s.stack.length = 0;
+  }
+
+  if (config.unload_images !== undefined) s.unload_images = config.unload_images;
+  if (config.focus_seek !== undefined) s.focus_seek = toFocusArray(config.focus_seek);
+  if (config.focus_back !== undefined) s.focus_back = toFocusArray(config.focus_back);
+  if (config.focus_home !== undefined) s.focus_home = toFocusArray(config.focus_home);
+  if (config.focus_error !== undefined) s.focus_error = toFocusArray(config.focus_error);
+  if (config.same_page !== undefined) s.same_page = config.same_page;
+  if (config.interrupt !== undefined) s.interrupt = config.interrupt;
+  if (config.lock !== undefined) s.lock = config.lock;
 }
 
 export function createRouter<
@@ -453,6 +458,7 @@ export function createRouter<
     focus_home: [],
     focus_error: [],
     same_page: 'reload',
+    lock: false,
     busy: false,
     errorText: '',
     getErrorText: () => s.errorText
