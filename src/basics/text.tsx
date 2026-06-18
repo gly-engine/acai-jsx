@@ -323,3 +323,57 @@ export function Text(props: AcaiTextProperties, std: GlyStd) {
     </item>
   );
 }
+
+export function TextBold(props: AcaiTextProperties, std: GlyStd) {
+  const mapH = { left: -1, center: 0, right: 1 }
+  const mapV = { top: -1, middle: 0, bottom: 1 }
+  const color = props.color ?? std.color.white
+  const content = props.children ?? props.content
+  const f_size = props.font_size ?? 12
+  const f_name = props.font_name ?? ""
+  const ah = props.align
+  const av = props.valign
+  const ah_is_function = typeof ah === 'function'
+  const av_is_function = typeof av === 'function'
+  const ah_value = (!ah_is_function && ah !== undefined? mapH[ah]: 0)
+  const av_value = (!av_is_function && av !== undefined? mapV[av]: 0)
+  const getColor = typeof color !== 'function' ? () => color : color
+  const getContent = typeof content !== 'function' ? () => content : content
+  const getFontSize = typeof f_size !== 'function' ? () => f_size : f_size
+  const getFontName = typeof f_name !== 'function' ? () => f_name : f_name
+  const getAlignH = !ah_is_function? () => ah_value : (() => mapH[ah()])
+  const getAlignV = !av_is_function? () => av_value : (() => mapV[av()])
+
+  return (
+    <item
+      style={props.style}
+      after={props.after}
+      offset={props.offset}
+      span={props.span ?? 1}>
+      <node
+        draw={(self: GlyApp["data"]) => {
+          const text = getContent();
+          const font = getFontName();
+
+          if (text.length < 0) return;
+          if (font.length > 0) std.text.font_name(font);
+
+          let x = 0, y = 0, h = getAlignH(), v = getAlignV();
+
+          if (h === 0) x = self.width / 2;
+          if (h === 1) x = self.width;
+          if (v === 0) y = self.height / 2;
+          if (v === 1) y = self.height;
+
+          std.text.font_size(getFontSize());
+          std.draw.color(getColor());
+
+          const span = 0.1
+          std.text.print_ex(x + span, y, text, -h as 0, -v as 0);
+          std.text.print_ex(x - span, y - span, text, -h as 0, -v as 0);
+          std.text.print_ex(x - span, y + span, text, -h as 0, -v as 0);
+        }}
+      />
+    </item>
+  );
+}
