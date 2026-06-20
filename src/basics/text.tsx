@@ -245,7 +245,7 @@ export function TextBlock(props: AcaiTextBlockProperties, std: GlyStd) {
 
           tokens.forEach((token) => {
             const y = token.y + roll;
-            if (y > 0 && (y + LH) < w) {
+            if (y >= 0 && (y + LH) <= w) {
               std.text.print(token.x, y, token.word);
             }
           });
