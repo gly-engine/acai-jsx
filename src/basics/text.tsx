@@ -42,7 +42,7 @@ export function AcaiGenerateTextTokens(
 ) {
   const tokens: AcaiTextToken[] = [];
   const words = text.split(" ");
-  const spaceSize = std.text.mensure_width(" ");
+  const [spaceSize] = std.text.mensure(" ");
   let y = 0;
 
   let lineWords: { word: string; width: number; height: number }[] = [];
@@ -86,7 +86,7 @@ export function AcaiGenerateTextTokens(
 
   function replaceLastWordWithEllipsis() {
     const dots = "...";
-    const w = std.text.mensure_width(dots);
+    const [w] = std.text.mensure(dots);
     const lastLine = lines.at(-1);
     if (!lastLine) return;
 
@@ -121,7 +121,7 @@ export function AcaiGenerateTextTokens(
   }
 
   for (let i = 0; i < words.length; i++) {
-    const w = std.text.mensure_width(words[i]);
+    const [w] = std.text.mensure(words[i]);
     const h = lh;
 
     const nextLineOverflow = lineWidth > 0 && lineWidth + spaceSize + w > width;

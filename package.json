@@ -18,12 +18,11 @@
     "format": "prettier --check ."
   },
   "devDependencies": {
-    "@gamely/gly-cli": "^0.3.11",
-    "@gamely/gly-jsx": "^0.3.1",
-    "@gamely/gly-types": "^0.2.4",
+    "@gamely/gly-cli": "github:gly-engine/gly-engine#45735bdfed4faabc576c1507a12eac90a722da08 ",
     "@typescript-eslint/eslint-plugin": "^8.39.1",
     "@typescript-eslint/parser": "^8.39.1",
     "eslint": "^9.33.0",
+    "fengari": "github:fengari-lua/fengari#6a8908380a9b5fc3a8f0fe1e9c1b79ce5dba9312",
     "prettier": "^3.6.2",
     "typescript-eslint": "^8.39.1",
     "typescript-to-lua": "^1.31.2"

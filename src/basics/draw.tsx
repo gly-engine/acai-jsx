@@ -63,7 +63,6 @@ const align3 = (child: number, parent: number) => (parent - child)
 
 export function Image(props: AcaiImageProperties, std: GlyStd) {
   const src = props.src
-  const hasFixedSize = props.width !== undefined && props.height !== undefined
   const mapH = { left: align1, center: align2, right: align3 }
   const mapV = { top: align1, middle: align2, bottom: align3 }
   const align = mapH[props.align ?? "center"]
@@ -86,9 +85,8 @@ export function Image(props: AcaiImageProperties, std: GlyStd) {
           if (source.length === 0) return;
           if (!std.image.exists(source)) return;
 
-          if(!hasFixedSize) {
-            height = std.image.mensure_height(source);
-            width = std.image.mensure_width(source);
+          if(width == 0 || height == 0) {
+            [width, height] = std.image.mensure(source);
           }
 
           if (width !== 0 && height !== 0) {
