@@ -10,6 +10,7 @@
     "build:sample:basic": "gly-cli build-html --cwd dist samples/basic/index.lua --outdir dist/web",
     "prebuild:sample:router": "npm run build",
     "build:sample:router": "gly-cli build-html --cwd dist samples/router/index.lua --outdir dist/web",
+    "build:sample:topic": "tstl && gly-cli build --cwd dist samples/topic/index.lua --outdir dist/topic",
     "postbuild": "cp README.md package.json tsconfig.json dist/src",
     "build": "tstl --declaration",
     "lint:fix": "eslint . --fix",
