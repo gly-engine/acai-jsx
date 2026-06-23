@@ -60,17 +60,66 @@ export type AcaiImageProperties =
 const align1 = (_: number, _2: number) => 0
 const align2 = (child: number, parent: number) => (parent - child) / 2
 const align3 = (child: number, parent: number) => (parent - child)
+const funcH = { left: align1, center: align2, right: align3 }
+const funcV = { top: align1, middle: align2, bottom: align3 }
+
+export function AcaiMemoizeImage(
+  std: GlyStd,
+  ah: AlignImage,
+  av: AlignImageHorizontal,
+  src: string,
+  width: number,
+  height: number,
+) {
+  const std_exists = std.image.exists;
+  const std_mensure = std.image.mensure;
+  const std_draw = std.image.draw;
+  const align = funcH[ah];
+  const valign = funcV[av];
+
+  let x = 0;
+  let y = 0;
+
+  let func: (data: GlyApp["data"]) => void;
+  func = (data) => {
+    if (src.length === 0) return;
+    if (!std_exists(src)) return;
+
+    if(width == 0 || height == 0) {
+      [width, height] = std_mensure(src);
+    }
+
+    x = align(width, data.width);
+    y = valign(height, data.height);
+
+    func = () => std_draw(src, x, y);
+  }
+
+  return (data: GlyApp["data"]) => func(data);
+}
 
 export function Image(props: AcaiImageProperties, std: GlyStd) {
   const src = props.src
-  const mapH = { left: align1, center: align2, right: align3 }
-  const mapV = { top: align1, middle: align2, bottom: align3 }
-  const align = mapH[props.align ?? "center"]
-  const valign = mapV[props.valign ?? "middle"]
+  const alignName = props.align ?? "center"
+  const valignName = props.valign ?? "middle"
+  const align = funcH[alignName]
+  const valign = funcV[valignName]
   const getSource = typeof src === 'string' ? () => src : src
 
   let width = props.width ?? 0;
   let height = props.height ?? 0;
+
+  if (typeof src === 'string') {
+    return (
+      <item
+        style={props.style}
+        after={props.after}
+        offset={props.offset}
+        span={props.span ?? 1}>
+        <node draw={AcaiMemoizeImage(std, alignName, valignName, src, width, height)} />
+      </item>
+    );
+  }
 
   return (
     <item
