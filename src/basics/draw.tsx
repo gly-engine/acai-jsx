@@ -85,9 +85,9 @@ export function AcaiMemoizeImage(
     if (src.length === 0) return;
     if (!std_exists(src)) return;
 
-    if(width == 0 || height == 0) {
-      [width, height] = std_mensure(src);
-    }
+    [width, height] = std_mensure(src);
+
+    if(width == 0 || height == 0) return;
 
     x = align(width, data.width);
     y = valign(height, data.height);
