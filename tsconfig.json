@@ -15,6 +15,7 @@
     "paths": {
       "@gamely/gly-types": ["./node_modules/@gamely/gly-cli/npm/gly-types/index.d.ts"]
     },
+    "downlevelIteration": true,
     "strict": true
   },
   "tstl": {
