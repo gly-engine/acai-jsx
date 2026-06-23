@@ -2,4 +2,4 @@
 .gitignore
 eslint.config.js
 README.md
-sample/
+samples/
