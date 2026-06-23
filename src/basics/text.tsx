@@ -31,6 +31,49 @@ export type AcaiTextToken = {
   word: string;
 };
 
+const align1 = (_: number, _2: number) => 0
+const align2 = (child: number, parent: number) => (parent - child) / 2
+const align3 = (child: number, parent: number) => (parent - child)
+const funcH = { left: align1, center: align2, right: align3 }
+const funcV = { top: align1, middle: align2, bottom: align3 }
+const mapH = { left: -1, center: 0, right: 1 }
+const mapV = { top: -1, middle: 0, bottom: 1 }
+
+export function AcaiMemoizePrint(std: GlyStd, ah: AlignTextSimple, av: AlignTextHorizontal, text: string | number, color: number, f_size: number, f_name: string) {
+  const std_font_name = std.text.font_name
+  const std_font_size = std.text.font_size
+  const std_font = f_name.length <= 0 ? std_font_size : (fs: number, fn: string) => {
+    std_font_name(fn);
+    std_font_size(fs);
+  };
+
+  const std_print = std.text.print;
+  const std_color = std.draw.color;
+
+  let x = 0;
+  let y = 0;
+
+  std.log.info('step 0')
+  let func: (data: GlyApp['data']) => void;
+  func = (data) => {
+    std.log.info('step 1');
+    std_font(f_size, f_name);
+    const [w, h] = std.text.mensure(text)
+
+    x = funcH[ah](w, data.width)
+    y = funcV[av](h, data.height)
+
+    func = () => {
+      std.log.info('step 2');
+      std_font(f_size, f_name);
+      std_color(color);
+      std_print(x, y, text);
+    }
+  }
+
+  return (data: GlyApp["data"]) => func(data);
+}
+
 export function AcaiGenerateTextTokens(
   std: GlyStd,
   text: string,
@@ -216,7 +259,7 @@ export function TextBlock(props: AcaiTextBlockProperties, std: GlyStd) {
           const roll = getScroll();
           const w = self.width
           const h = self.height
-          const h_mayabe = hasScroll? undefined: h
+          const h_mayabe = hasScroll ? undefined : h
 
           if (text.length <= 0) return;
 
@@ -274,24 +317,41 @@ export type AcaiTextProperties =
 
 
 export function Text(props: AcaiTextProperties, std: GlyStd) {
-  const mapH = { left: -1, center: 0, right: 1 }
-  const mapV = { top: -1, middle: 0, bottom: 1 }
+  const ah = props.align ?? 'center'
+  const av = props.valign ?? 'middle'
   const color = props.color ?? std.color.white
   const content = props.children ?? props.content
   const f_size = props.font_size ?? 12
-  const f_name = props.font_name ?? ""
-  const ah = props.align
-  const av = props.valign
+  const f_name = props.font_name ?? ''
+  const is_static = typeof color !== 'function'
+    && typeof content !== 'function'
+    && typeof f_size !== 'function'
+    && typeof f_name !== 'function'
+    && typeof ah !== 'function'
+    && typeof av !== 'function';
+
+  /*if (is_static) {
+    return (
+      <item
+        style={props.style}
+        after={props.after}
+        offset={props.offset}
+        span={props.span ?? 1}>
+        <node draw={AcaiMemoizePrint(std, ah, av, content, color, f_size, f_name)} />
+      </item>
+    )
+  }*/
+
   const ah_is_function = typeof ah === 'function'
   const av_is_function = typeof av === 'function'
-  const ah_value = (!ah_is_function && ah !== undefined? mapH[ah]: 0)
-  const av_value = (!av_is_function && av !== undefined? mapV[av]: 0)
+  const ah_value = (!ah_is_function && ah !== undefined ? mapH[ah] : 0)
+  const av_value = (!av_is_function && av !== undefined ? mapV[av] : 0)
   const getColor = typeof color !== 'function' ? () => color : color
   const getContent = typeof content !== 'function' ? () => content : content
   const getFontSize = typeof f_size !== 'function' ? () => f_size : f_size
   const getFontName = typeof f_name !== 'function' ? () => f_name : f_name
-  const getAlignH = !ah_is_function? () => ah_value : (() => mapH[ah()])
-  const getAlignV = !av_is_function? () => av_value : (() => mapV[av()])
+  const getAlignH = !ah_is_function ? () => ah_value : (() => mapH[ah()])
+  const getAlignV = !av_is_function ? () => av_value : (() => mapV[av()])
 
   return (
     <item
@@ -335,14 +395,14 @@ export function TextBold(props: AcaiTextProperties, std: GlyStd) {
   const av = props.valign
   const ah_is_function = typeof ah === 'function'
   const av_is_function = typeof av === 'function'
-  const ah_value = (!ah_is_function && ah !== undefined? mapH[ah]: 0)
-  const av_value = (!av_is_function && av !== undefined? mapV[av]: 0)
+  const ah_value = (!ah_is_function && ah !== undefined ? mapH[ah] : 0)
+  const av_value = (!av_is_function && av !== undefined ? mapV[av] : 0)
   const getColor = typeof color !== 'function' ? () => color : color
   const getContent = typeof content !== 'function' ? () => content : content
   const getFontSize = typeof f_size !== 'function' ? () => f_size : f_size
   const getFontName = typeof f_name !== 'function' ? () => f_name : f_name
-  const getAlignH = !ah_is_function? () => ah_value : (() => mapH[ah()])
-  const getAlignV = !av_is_function? () => av_value : (() => mapV[av()])
+  const getAlignH = !ah_is_function ? () => ah_value : (() => mapH[ah()])
+  const getAlignV = !av_is_function ? () => av_value : (() => mapV[av()])
 
   return (
     <item
