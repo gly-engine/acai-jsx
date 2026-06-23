@@ -53,10 +53,8 @@ export function AcaiMemoizePrint(std: GlyStd, ah: AlignTextSimple, av: AlignText
   let x = 0;
   let y = 0;
 
-  std.log.info('step 0')
   let func: (data: GlyApp['data']) => void;
   func = (data) => {
-    std.log.info('step 1');
     std_font(f_size, f_name);
     const [w, h] = std.text.mensure(text)
 
@@ -64,7 +62,6 @@ export function AcaiMemoizePrint(std: GlyStd, ah: AlignTextSimple, av: AlignText
     y = funcV[av](h, data.height)
 
     func = () => {
-      std.log.info('step 2');
       std_font(f_size, f_name);
       std_color(color);
       std_print(x, y, text);
@@ -330,7 +327,7 @@ export function Text(props: AcaiTextProperties, std: GlyStd) {
     && typeof ah !== 'function'
     && typeof av !== 'function';
 
-  /*if (is_static) {
+  if (is_static) {
     return (
       <item
         style={props.style}
@@ -340,7 +337,7 @@ export function Text(props: AcaiTextProperties, std: GlyStd) {
         <node draw={AcaiMemoizePrint(std, ah, av, content, color, f_size, f_name)} />
       </item>
     )
-  }*/
+  }
 
   const ah_is_function = typeof ah === 'function'
   const av_is_function = typeof av === 'function'

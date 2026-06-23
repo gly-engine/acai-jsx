@@ -1,4 +1,4 @@
-type AcaiTopic<TArgs extends any[] = []> = (...args: TArgs) => void;
+type AcaiTopic<TArgs extends any[] = []> = (this: void, ...args: TArgs) => void;
 
 export function createBus<TArgs extends any[] = []>(): LuaMultiReturn<[
   emit: (...args: TArgs) => void,
