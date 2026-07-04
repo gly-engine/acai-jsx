@@ -6,7 +6,8 @@ export type AcaiRectProperties =
     | { borderColor?: number | (() => number); backgroundColor: number | (() => number) }
   )
   & { radius?: number | (() => number) }
-  & { span?: number, offset?: number, after?: number, style?: string }
+  & { id?: string, span?: number, offset?: number, after?: number, style?: string }
+  & { click?: () => void, hover?: () => void, focus?: () => void, unfocus?: () => void}
   ;
 
 export function Rect(props: AcaiRectProperties, std: GlyStd) {
@@ -19,11 +20,16 @@ export function Rect(props: AcaiRectProperties, std: GlyStd) {
 
   return (
     <item
+      id={props.id}
       style={props.style}
       after={props.after}
       offset={props.offset}
       span={props.span ?? 1}>
       <node
+        hover={props.hover}
+        click={props.click}
+        focus={props.focus}
+        unfocus={props.unfocus}
         draw={(self: GlyApp["data"]) => {
           if (getColor0 !== undefined) {
             std.draw.color(getColor0());
@@ -51,11 +57,14 @@ export type AcaiImageProperties =
     offset?: number;
     after?: number;
     style?: string;
+    id?: string;
   }
   & (
     | { width: number; height: number }
     | { width?: never; height?: never }
-  );
+  )
+  & { click?: () => void, hover?: () => void, focus?: () => void, unfocus?: () => void}
+  ;
 
 const align1 = (_: number, _2: number) => 0
 const align2 = (child: number, parent: number) => (parent - child) / 2
@@ -123,11 +132,16 @@ export function Image(props: AcaiImageProperties, std: GlyStd) {
 
   return (
     <item
+      id={props.id}
       style={props.style}
       after={props.after}
       offset={props.offset}
       span={props.span ?? 1}>
       <node
+        hover={props.hover}
+        click={props.click}
+        focus={props.focus}
+        unfocus={props.unfocus}
         draw={(self: GlyApp["data"]) => {
           const source = getSource();
 
