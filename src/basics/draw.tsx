@@ -121,11 +121,17 @@ export function Image(props: AcaiImageProperties, std: GlyStd) {
   if (typeof src === 'string') {
     return (
       <item
+        id={props.id}
         style={props.style}
         after={props.after}
         offset={props.offset}
         span={props.span ?? 1}>
-        <node draw={AcaiMemoizeImage(std, alignName, valignName, src, width, height)} />
+        <node
+          hover={props.hover}
+          click={props.click}
+          focus={props.focus}
+          unfocus={props.unfocus}
+          draw={AcaiMemoizeImage(std, alignName, valignName, src, width, height)} />
       </item>
     );
   }
