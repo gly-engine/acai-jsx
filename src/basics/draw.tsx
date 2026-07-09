@@ -7,7 +7,7 @@ export type AcaiRectProperties =
   )
   & { radius?: number | (() => number) }
   & { id?: string, span?: number, offset?: number, after?: number, style?: string }
-  & { click?: () => void, hover?: () => void, focus?: () => void, unfocus?: () => void}
+  & { click?: Function, hover?: Function, focus?: Function, unfocus?: Function}
   ;
 
 export function Rect(props: AcaiRectProperties, std: GlyStd) {
@@ -63,7 +63,7 @@ export type AcaiImageProperties =
     | { width: number; height: number }
     | { width?: never; height?: never }
   )
-  & { click?: () => void, hover?: () => void, focus?: () => void, unfocus?: () => void}
+  & { click?: Function, hover?: Function, focus?: Function, unfocus?: Function}
   ;
 
 const align1 = (_: number, _2: number) => 0
