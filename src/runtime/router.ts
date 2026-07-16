@@ -125,9 +125,6 @@ const isPageGenerator = (
   && typeof (v as { next?: unknown }).next === "function"
   && typeof (v as { [Symbol.iterator]?: unknown })[Symbol.iterator] === "function";
 
-const spawnTop = <T extends PagesMap>(s: State<T>, el: JSX.Element): GlyApp =>
-  s.std!.node.spawn(el);
-
 const spawnInRoot = <T extends PagesMap>(s: State<T>, el: any): GlyApp =>
   (s.std!.node.spawn as any)(el, s.rootApp) as GlyApp;
 
@@ -183,17 +180,19 @@ async function mount<T extends PagesMap>(
 
   // Pre-create error apps (paused) and splash app before running the page function,
   // so handleError can resume them synchronously without any async work.
+  // Spawned under rootApp (never under engine.current): a page-relative parent
+  // would die together with the page and leave stale refs in internalApps.
   for (const route of ERROR_ROUTES) {
     if (!s.internalApps[route] && s.internalPages[route]) {
       const pageFn = s.internalPages[route]!;
-      const app = spawnTop(s, await resolve(pageFn({ getMessage: s.getErrorText }, s.std!)));
+      const app = spawnInRoot(s, await resolve(pageFn({ getMessage: s.getErrorText }, s.std!)));
       s.std!.node.pause(app);
       s.internalApps[route] = app;
     }
   }
   if (!s.internalApps['@splash'] && s.internalPages['@splash']) {
     const pageFn = s.internalPages['@splash']!;
-    s.internalApps['@splash'] = spawnTop(s, await resolve(pageFn({}, s.std!)));
+    s.internalApps['@splash'] = spawnInRoot(s, await resolve(pageFn({}, s.std!)));
   }
 
   if (s.internalApps['@splash']) s.std!.node.resume(s.internalApps['@splash']!);
@@ -209,16 +208,16 @@ async function mount<T extends PagesMap>(
 
   if (isPageGenerator(result)) {
     let firstMount = true;
+    // Spawn BEFORE kill: the element is already attached under engine.current
+    // (JSX spawns eagerly), which may sit inside the dying subtree — killing
+    // first would take the fresh page down with it.
     const mountStep = (el: JSX.Element): void => {
+      const prev = s.currentApp;
+      s.currentApp = spawnInRoot(s, el);
+      if (prev) s.std!.node.kill(prev);
       if (firstMount) {
-        killCurrent(s);
-        s.currentApp = spawnInRoot(s, el);
         if (s.internalApps['@splash']) s.std!.node.pause(s.internalApps['@splash']!);
         firstMount = false;
-      } else {
-        const prev = s.currentApp;
-        s.currentApp = spawnInRoot(s, el);
-        if (prev) s.std!.node.kill(prev);
       }
     };
 
@@ -237,8 +236,10 @@ async function mount<T extends PagesMap>(
       }
     }
   } else {
-    killCurrent(s);
-    s.currentApp = spawnInRoot(s, await resolve(result));
+    const el = await resolve(result);
+    const prev = s.currentApp;
+    s.currentApp = spawnInRoot(s, el);
+    if (prev) s.std!.node.kill(prev);
     if (s.internalApps['@splash']) s.std!.node.pause(s.internalApps['@splash']!);
   }
 
@@ -458,6 +459,7 @@ export function createRouter<
     focus_home: [],
     focus_error: [],
     same_page: 'reload',
+    interrupt: 'block',
     lock: false,
     busy: false,
     errorText: '',
