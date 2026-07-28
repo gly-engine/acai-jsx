@@ -48,7 +48,7 @@ type RouterConfig = {
   focus_back?: FocusMemoOption;
   focus_home?: FocusMemoOption;
   focus_error?: FocusOption;
-  same_page?: 'block' | 'reload';
+  same_page?: 'block' | 'reload' | 'refocus';
   interrupt?: 'block';
   lock?: boolean;
 };
@@ -60,7 +60,7 @@ type State<T extends PagesMap> = {
   focus_back: FocusTargetMemo[];
   focus_home: FocusTargetMemo[];
   focus_error: FocusTarget[];
-  same_page: 'block' | 'reload';
+  same_page: 'block' | 'reload' | 'refocus';
   interrupt?: 'block';
   lock: boolean;
   busy: boolean;
@@ -200,10 +200,6 @@ async function mount<T extends PagesMap>(
     if (s.internalApps[route]) s.std!.node.pause(s.internalApps[route]!);
   }
 
-  if (s.unload_images) {
-    s.std!.image.unload_all();
-  }
-
   const result = fn(entry.params, s.std!);
 
   if (isPageGenerator(result)) {
@@ -212,6 +208,10 @@ async function mount<T extends PagesMap>(
     // (JSX spawns eagerly), which may sit inside the dying subtree — killing
     // first would take the fresh page down with it.
     const mountStep = (el: JSX.Element): void => {
+      // Unload right at the swap, never before: the outgoing page (or the
+      // splash, mid-async-wait) is still the only thing on screen up to this
+      // point, and nuking images out from under it breaks its render.
+      if (firstMount && s.unload_images) s.std!.image.unload_all();
       const prev = s.currentApp;
       s.currentApp = spawnInRoot(s, el);
       if (prev) s.std!.node.kill(prev);
@@ -237,6 +237,7 @@ async function mount<T extends PagesMap>(
     }
   } else {
     const el = await resolve(result);
+    if (s.unload_images) s.std!.image.unload_all();
     const prev = s.currentApp;
     s.currentApp = spawnInRoot(s, el);
     if (prev) s.std!.node.kill(prev);
@@ -291,22 +292,34 @@ function handleError<T extends PagesMap>(s: State<T>, err: unknown): void {
 
 async function navigate<T extends PagesMap>(
   s: State<T>,
-  op: () => Entry<T> | undefined,
+  peek: () => Entry<T> | undefined,
+  commit: (entry: Entry<T>) => Entry<T>,
   focus: FocusTargetMemo[],
   targetPath?: string,
 ): Promise<void> {
   if (s.lock) return;
   if (s.interrupt === 'block' && s.busy) return;
-  if (s.same_page === 'block' && targetPath !== undefined) {
+  if (targetPath !== undefined) {
     const top = s.stack[s.stack.length - 1];
-    if (top && top.path === targetPath) return;
+    if (top && top.path === targetPath) {
+      if (s.same_page === 'block') return;
+      if (s.same_page === 'refocus') {
+        applyFocus(s, top, focus);
+        return;
+      }
+      // 'reload' falls through to a full unmount/mount cycle below.
+    }
   }
   s.busy = true;
   try {
     rememberFocus(s);
     const currentEntry = s.stack[s.stack.length - 1];
-    const next = op();
-    if (next) {
+    // Validate the destination BEFORE touching the stack or running the
+    // outgoing page's unmount — an invalid target must not destroy anything.
+    const candidate = peek();
+    if (candidate) {
+      if (!s.userPages[candidate.path]) throw new NotFoundError(candidate.path);
+      const next = commit(candidate);
       if (currentEntry) {
         const unmountFn = s.userUnmounts[currentEntry.path];
         if (unmountFn) await runUnmount(s, unmountFn, currentEntry.params);
@@ -323,9 +336,8 @@ async function navigate<T extends PagesMap>(
 function go<T extends PagesMap, K extends PagePath<T>>(
   s: State<T>, path: K, params: PageProps<T, K>,
 ): Promise<void> {
-  return navigate(s, () => {
-    const i = s.stack.findIndex(e => e.path === path);
-    const entry: Entry<T> = { path, params: params as PageParams };
+  return navigate(s, () => ({ path, params: params as PageParams }), (entry) => {
+    const i = s.stack.findIndex(e => e.path === entry.path);
     if (i >= 0) {
       entry.focusedId = s.stack[i].focusedId;
       s.stack.splice(i + 1);
@@ -341,6 +353,8 @@ function go<T extends PagesMap, K extends PagePath<T>>(
 function back<T extends PagesMap>(s: State<T>): Promise<void> {
   return navigate(s, () => {
     if (s.stack.length <= 1) return undefined;
+    return s.stack[s.stack.length - 2];
+  }, () => {
     s.stack.pop();
     return s.stack[s.stack.length - 1];
   }, s.focus_back);
@@ -349,6 +363,8 @@ function back<T extends PagesMap>(s: State<T>): Promise<void> {
 function home<T extends PagesMap>(s: State<T>): Promise<void> {
   return navigate(s, () => {
     if (s.stack.length <= 1) return undefined;
+    return s.stack[0];
+  }, () => {
     s.stack.splice(1);
     return s.stack[0];
   }, s.focus_home);
@@ -357,8 +373,7 @@ function home<T extends PagesMap>(s: State<T>): Promise<void> {
 function replace<T extends PagesMap, K extends PagePath<T>>(
   s: State<T>, path: K, params: PageProps<T, K>,
 ): Promise<void> {
-  return navigate(s, () => {
-    const entry: Entry<T> = { path, params: params as PageParams };
+  return navigate(s, () => ({ path, params: params as PageParams }), (entry) => {
     if (s.stack.length === 0) s.stack.push(entry);
     else s.stack[s.stack.length - 1] = entry;
     return entry;
@@ -368,8 +383,7 @@ function replace<T extends PagesMap, K extends PagePath<T>>(
 function reset<T extends PagesMap, K extends PagePath<T>>(
   s: State<T>, path: K, params: PageProps<T, K>,
 ): Promise<void> {
-  return navigate(s, () => {
-    const entry: Entry<T> = { path, params: params as PageParams };
+  return navigate(s, () => ({ path, params: params as PageParams }), (entry) => {
     s.stack.length = 0;
     s.stack.push(entry);
     return entry;
