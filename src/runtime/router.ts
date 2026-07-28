@@ -204,14 +204,15 @@ async function mount<T extends PagesMap>(
 
   if (isPageGenerator(result)) {
     let firstMount = true;
-    // Spawn BEFORE kill: the element is already attached under engine.current
-    // (JSX spawns eagerly), which may sit inside the dying subtree — killing
-    // first would take the fresh page down with it.
+    let unloaded = false;
+    const unloadOnce = (): void => {
+      if (unloaded) return;
+      unloaded = true;
+      if (s.unload_images) s.std!.image.unload_all();
+    };
+
     const mountStep = (el: JSX.Element): void => {
-      // Unload right at the swap, never before: the outgoing page (or the
-      // splash, mid-async-wait) is still the only thing on screen up to this
-      // point, and nuking images out from under it breaks its render.
-      if (firstMount && s.unload_images) s.std!.image.unload_all();
+      if (firstMount) unloadOnce();
       const prev = s.currentApp;
       s.currentApp = spawnInRoot(s, el);
       if (prev) s.std!.node.kill(prev);
@@ -224,19 +225,29 @@ async function mount<T extends PagesMap>(
     while (true) {
       const step = result.next();
       if (step.done) {
-        if (step.value !== undefined) mountStep(step.value as JSX.Element);
+        if (step.value) mountStep(step.value as JSX.Element);
         break;
       }
       const value = step.value;
       if (typeof value === 'function') {
+        if (firstMount) {
+          unloadOnce();
+          killCurrent(s);
+        }
         const ret = await value();
-        if (ret !== undefined) mountStep(ret as JSX.Element);
-      } else {
+        if (ret) mountStep(ret as JSX.Element);
+      } else if (value) {
         mountStep(value as JSX.Element);
       }
     }
+  } else if (isThenable(result)) {
+    if (s.unload_images) s.std!.image.unload_all();
+    killCurrent(s);
+    const el = await result;
+    s.currentApp = spawnInRoot(s, el as JSX.Element);
+    if (s.internalApps['@splash']) s.std!.node.pause(s.internalApps['@splash']!);
   } else {
-    const el = await resolve(result);
+    const el = result as JSX.Element;
     if (s.unload_images) s.std!.image.unload_all();
     const prev = s.currentApp;
     s.currentApp = spawnInRoot(s, el);
@@ -264,8 +275,8 @@ async function runUnmount<T extends PagesMap>(
     const value = step.value;
     if (typeof value === 'function') {
       const ret = await value();
-      if (ret !== undefined) swap(ret as JSX.Element);
-    } else {
+      if (ret) swap(ret as JSX.Element);
+    } else if (value) {
       swap(value as JSX.Element);
     }
   }
@@ -344,7 +355,7 @@ function go<T extends PagesMap, K extends PagePath<T>>(
       s.stack[i] = entry;
     } else {
       s.stack.push(entry);
-      if (s.stack.length > STACK_CAP) s.stack.shift();
+      if (s.stack.length > STACK_CAP) s.stack.splice(1, 1);
     }
     return entry;
   }, s.focus_seek, path);
