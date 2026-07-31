@@ -106,6 +106,7 @@ export function AcaiMemoizeImage(
     y = valign(height, data.height);
 
     func = () => std_draw(src, x, y);
+    func(data);
   }
 
   return (data: GlyApp["data"]) => func(data);

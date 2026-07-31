@@ -195,6 +195,9 @@ async function mount<T extends PagesMap>(
     s.internalApps['@splash'] = spawnInRoot(s, await resolve(pageFn({}, s.std!)));
   }
 
+  if (s.unload_images) s.std!.image.unload_all();
+  killCurrent(s);
+
   if (s.internalApps['@splash']) s.std!.node.resume(s.internalApps['@splash']!);
   for (const route of ERROR_ROUTES) {
     if (s.internalApps[route]) s.std!.node.pause(s.internalApps[route]!);
@@ -204,15 +207,7 @@ async function mount<T extends PagesMap>(
 
   if (isPageGenerator(result)) {
     let firstMount = true;
-    let unloaded = false;
-    const unloadOnce = (): void => {
-      if (unloaded) return;
-      unloaded = true;
-      if (s.unload_images) s.std!.image.unload_all();
-    };
-
     const mountStep = (el: JSX.Element): void => {
-      if (firstMount) unloadOnce();
       const prev = s.currentApp;
       s.currentApp = spawnInRoot(s, el);
       if (prev) s.std!.node.kill(prev);
@@ -230,10 +225,6 @@ async function mount<T extends PagesMap>(
       }
       const value = step.value;
       if (typeof value === 'function') {
-        if (firstMount) {
-          unloadOnce();
-          killCurrent(s);
-        }
         const ret = await value();
         if (ret) mountStep(ret as JSX.Element);
       } else if (value) {
@@ -241,17 +232,12 @@ async function mount<T extends PagesMap>(
       }
     }
   } else if (isThenable(result)) {
-    if (s.unload_images) s.std!.image.unload_all();
-    killCurrent(s);
     const el = await result;
     s.currentApp = spawnInRoot(s, el as JSX.Element);
     if (s.internalApps['@splash']) s.std!.node.pause(s.internalApps['@splash']!);
   } else {
     const el = result as JSX.Element;
-    if (s.unload_images) s.std!.image.unload_all();
-    const prev = s.currentApp;
     s.currentApp = spawnInRoot(s, el);
-    if (prev) s.std!.node.kill(prev);
     if (s.internalApps['@splash']) s.std!.node.pause(s.internalApps['@splash']!);
   }
 
