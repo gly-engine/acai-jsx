@@ -7,7 +7,7 @@ export type AcaiRectProperties =
   )
   & { radius?: number | (() => number) }
   & { id?: string, span?: number, offset?: number, after?: number, style?: string }
-  & { click?: Function, hover?: Function, focus?: Function, unfocus?: Function}
+  & { click?: Function, hover?: Function, focus?: Function, unfocus?: Function }
   ;
 
 export function Rect(props: AcaiRectProperties, std: GlyStd) {
@@ -16,7 +16,7 @@ export function Rect(props: AcaiRectProperties, std: GlyStd) {
   const r = props.radius ?? 0;
   const getColor0 = typeof c0 === 'number' ? () => c0 : c0
   const getColor1 = typeof c1 === 'number' ? () => c1 : c1
-  const getRadius = typeof r === 'number'? () => r: r
+  const getRadius = typeof r === 'number' ? () => r : r
 
   return (
     <item
@@ -51,20 +51,24 @@ export type AlignImageHorizontal = "top" | "middle" | "bottom";
 export type AcaiImageProperties =
   {
     src: (string) | (() => string);
+    lazy?: string;
     align?: ("left" | "center" | "right");
     valign?: ("top" | "middle" | "bottom");
+  } & {
+    id?: string;
     span?: number;
     offset?: number;
     after?: number;
     style?: string;
-    id?: string;
-  }
-  & (
+  } & (
     | { width: number; height: number }
     | { width?: never; height?: never }
-  )
-  & { click?: Function, hover?: Function, focus?: Function, unfocus?: Function}
-  ;
+  ) & {
+    click?: Function,
+    hover?: Function,
+    focus?: Function,
+    unfocus?: Function
+  };
 
 const align1 = (_: number, _2: number) => 0
 const align2 = (child: number, parent: number) => (parent - child) / 2
@@ -96,7 +100,7 @@ export function AcaiMemoizeImage(
 
     [width, height] = std_mensure(src);
 
-    if(width == 0 || height == 0) return;
+    if (width == 0 || height == 0) return;
 
     x = align(width, data.width);
     y = valign(height, data.height);
@@ -107,34 +111,64 @@ export function AcaiMemoizeImage(
   return (data: GlyApp["data"]) => func(data);
 }
 
+export function AcaiLazyImage(
+  std: GlyStd,
+  ah: AlignImage,
+  av: AlignImageHorizontal,
+  lazy: string,
+  src: string,
+  memoize: typeof AcaiMemoizeImage,
+) {
+  const std_exists = std.image.exists;
+  const std_mensure = std.image.mensure;
+  const real = memoize(std, ah, av, src, 0, 0);
+  const hold = memoize(std, ah, av, lazy, 0, 0);
+
+  let func: (data: GlyApp["data"]) => void;
+  func = (data) => {
+    if (src.length !== 0 && std_exists(src)) {
+      const [w, h] = std_mensure(src);
+      if (w !== 0 && h !== 0) {
+        func = real;
+        func(data);
+        return;
+      }
+    }
+    hold(data);
+  };
+
+  return (data: GlyApp["data"]) => func(data);
+}
+
+export function AcaiDynamicImage(
+  getSource: () => string,
+  build: (src: string) => (data: GlyApp["data"]) => void,
+) {
+  let current = getSource();
+  let func = build(current);
+  return (data: GlyApp["data"]) => {
+    const next = getSource();
+    if (next !== current) {
+      current = next;
+      func = build(next);
+    }
+    func(data);
+  };
+}
+
 export function Image(props: AcaiImageProperties, std: GlyStd) {
-  const src = props.src
   const alignName = props.align ?? "center"
   const valignName = props.valign ?? "middle"
-  const align = funcH[alignName]
-  const valign = funcV[valignName]
-  const getSource = typeof src === 'string' ? () => src : src
+  const width = props.width ?? 0;
+  const height = props.height ?? 0;
 
-  let width = props.width ?? 0;
-  let height = props.height ?? 0;
+  const buildOne = (s: string) => props.lazy
+    ? AcaiLazyImage(std, alignName, valignName, props.lazy, s, AcaiMemoizeImage)
+    : AcaiMemoizeImage(std, alignName, valignName, s, width, height);
 
-  if (typeof src === 'string') {
-    return (
-      <item
-        id={props.id}
-        style={props.style}
-        after={props.after}
-        offset={props.offset}
-        span={props.span ?? 1}>
-        <node
-          hover={props.hover}
-          click={props.click}
-          focus={props.focus}
-          unfocus={props.unfocus}
-          draw={AcaiMemoizeImage(std, alignName, valignName, src, width, height)} />
-      </item>
-    );
-  }
+  const func = typeof props.src === "function"
+    ? AcaiDynamicImage(props.src, buildOne)
+    : buildOne(props.src);
 
   return (
     <item
@@ -148,23 +182,7 @@ export function Image(props: AcaiImageProperties, std: GlyStd) {
         click={props.click}
         focus={props.focus}
         unfocus={props.unfocus}
-        draw={(self: GlyApp["data"]) => {
-          const source = getSource();
-
-          if (source.length === 0) return;
-          if (!std.image.exists(source)) return;
-
-          if(width == 0 || height == 0) {
-            [width, height] = std.image.mensure(source);
-          }
-
-          if (width !== 0 && height !== 0) {
-            const x = align(width, self.width);
-            const y = valign(height, self.height);
-            std.image.draw(source, x, y);
-          }
-        }}
-      />
+        draw={func} />
     </item>
   );
 }
