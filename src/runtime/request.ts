@@ -4,6 +4,7 @@ export type AcaiHttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
 
 export type AcaiHttpOptions = {
     headers?: Record<string, string>;
+    params?: Record<string, string>;
     body?: string | object;
 }
 
@@ -70,6 +71,7 @@ function factoryRequest(getConfig: AcaiHttpGetConfigs, method: AcaiHttpMethod) {
 
             const headers = opts?.headers ? { ...base_headers, ...opts.headers } : base_headers;
             for (const [k, v] of Object.entries(headers)) http.header(k, v);
+            for (const [k, v] of Object.entries(opts?.params ?? {})) http.param(k, v);
 
             if (typeof opts?.body === 'string') http.body(opts.body);
             if (typeof opts?.body === 'object') http.body(opts.body);
