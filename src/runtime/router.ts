@@ -83,6 +83,7 @@ type Router<T extends PagesMap> = {
   home: (this: void) => Promise<void>;
   error: (this: void, err: unknown) => void;
   current: (this: void) => PagePath<T> | undefined;
+  busy: (this: void) => boolean;
   register(path: '@error' | '@error/not-found', fn: AcaiRouterPageError): void;
   register(path: '@splash', fn: AcaiRouterPageSplash): void;
   register<K extends PagePath<T>, P extends PageProps<T, K>>(path: K, fn: AcaiRouterPage<P>, unmount?: AcaiRouterPageUnmount<P>): void;
@@ -485,6 +486,7 @@ export function createRouter<
     home: () => home(s),
     error: (err) => handleError(s, err),
     current: () => s.stack[s.stack.length - 1]?.path,
+    busy: () => s.busy,
     register: ((
       path: AcaiRouterInternalString | PagePath<T>,
       fn: AcaiRouterPageError | AcaiRouterPageSplash | T[PagePath<T>],
