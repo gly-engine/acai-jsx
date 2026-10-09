@@ -22,8 +22,11 @@ type InternalPages = {
 };
 type PagesMap = Record<string, AcaiRouterPage<any>>;
 type PagePath<T extends PagesMap> = keyof T & string;
+// distributive over K: a union of paths yields the union of their props
 type PageProps<T extends PagesMap, K extends keyof T> =
-  T[K] extends (props: infer P, std: GlyStd) => unknown ? P : never;
+  K extends keyof T
+    ? T[K] extends (props: infer P, std: GlyStd) => unknown ? P : never
+    : never;
 type Entry<T extends PagesMap> = {
   path: PagePath<T>;
   params: PageParams;
