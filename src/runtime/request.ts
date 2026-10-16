@@ -91,10 +91,7 @@ function factoryRequest(getConfig: AcaiHttpGetConfigs, method: AcaiHttpMethod) {
             /** Fengari/TSTL: Promise.reject corrompe o motivo; sempre resolve + ok=false e deixa getJson lançar string. */
             const finish = (s: GlyStdWithHttpResponse, ok: boolean) => {
                 const response = toResponse(s, ok);
-                if (std.log?.info) {
-                    const tail = fullUrl.length > 72 ? fullUrl.slice(-72) : fullUrl;
-                    std.log.info(`[gly] http ${ok ? "ok" : "fail"} ${response.status} ${tail}`);
-                }
+                /** Fengari: std.log dentro do callback HTTP quebra coroutine async (TSTL). */
                 resolve(response);
                 scheduleEnginePump(std);
             };
