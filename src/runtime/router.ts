@@ -323,7 +323,10 @@ async function navigate<T extends PagesMap>(
   targetPath?: string,
 ): Promise<void> {
   if (s.lock) return;
-  if (s.interrupt === 'block' && s.busy) return;
+  if (s.interrupt === 'block' && s.busy) {
+    if (s.std?.log?.info) s.std.log.info('[gly] nav skipped (busy)');
+    return;
+  }
   if (targetPath !== undefined) {
     const top = s.stack[s.stack.length - 1];
     if (top && top.path === targetPath) {
@@ -336,6 +339,9 @@ async function navigate<T extends PagesMap>(
     }
   }
   s.busy = true;
+  if (s.std?.log?.info && targetPath !== undefined) {
+    s.std.log.info(`[gly] nav ${targetPath}`);
+  }
   try {
     rememberFocus(s);
     const currentEntry = s.stack[s.stack.length - 1];
@@ -362,6 +368,7 @@ async function navigate<T extends PagesMap>(
 function go<T extends PagesMap, K extends PagePath<T>>(
   s: State<T>, path: K, params: PageProps<T, K>,
 ): Promise<void> {
+  if (s.std?.log?.info) s.std.log.info(`[gly] nav go ${path}`);
   return navigate(s, () => ({ path, params: params as PageParams }), (entry) => {
     const i = s.stack.findIndex(e => e.path === entry.path);
     if (i >= 0) {
