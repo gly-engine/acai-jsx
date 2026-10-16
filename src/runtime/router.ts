@@ -246,25 +246,12 @@ async function mountPageGenerator<T extends PagesMap>(
   applyFocus(s, entry, focus);
 }
 
-/** Sync shell + `.then` for page async — Fengari: outer `async function mount` never ran on the same tick. */
-function mount<T extends PagesMap>(
+function mountPageResult<T extends PagesMap>(
   s: State<T>,
+  result: unknown,
   entry: Entry<T>,
   focus: FocusTargetMemo[],
 ): Promise<void> {
-  const fn = s.userPages[entry.path] as AcaiRouterPage<any> | undefined;
-  if (!fn) return Promise.reject(new NotFoundError(entry.path));
-
-  try {
-    mountPreloadInternalApps(s);
-    mountShowSplash(s);
-  } catch (e) {
-    return Promise.reject(e);
-  }
-
-  const result = fn(entry.params, s.std!);
-  scheduleEnginePump(s.std);
-
   if (isPageGenerator(result)) {
     return mountPageGenerator(s, result, entry, focus).then(() => {
       scheduleEnginePump(s.std);
@@ -288,6 +275,31 @@ function mount<T extends PagesMap>(
   applyFocus(s, entry, focus);
   scheduleEnginePump(s.std);
   return Promise.resolve();
+}
+
+/** Sync shell; page fn on next promise tick so Fengari XHR can finish across frames. */
+function mount<T extends PagesMap>(
+  s: State<T>,
+  entry: Entry<T>,
+  focus: FocusTargetMemo[],
+): Promise<void> {
+  const fn = s.userPages[entry.path] as AcaiRouterPage<any> | undefined;
+  if (!fn) return Promise.reject(new NotFoundError(entry.path));
+
+  try {
+    mountPreloadInternalApps(s);
+    mountShowSplash(s);
+  } catch (e) {
+    return Promise.reject(e);
+  }
+
+  scheduleEnginePump(s.std);
+  return Promise.resolve().then(() => {
+    scheduleEnginePump(s.std);
+    const result = fn(entry.params, s.std!);
+    scheduleEnginePump(s.std);
+    return mountPageResult(s, result, entry, focus);
+  });
 }
 
 async function runUnmount<T extends PagesMap>(
