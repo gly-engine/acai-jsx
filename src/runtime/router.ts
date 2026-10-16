@@ -119,12 +119,8 @@ const isThenable = (v: unknown): v is Promise<unknown> => {
   return maybe != null && typeof maybe.then === 'function';
 };
 
-const resolve = async <X>(v: X | Promise<X>, std?: GlyStd): Promise<X> => {
-  if (!isThenable(v)) return v;
-  const out = await v;
-  scheduleEnginePump(std);
-  return out;
-};
+const resolve = async <X>(v: X | Promise<X>): Promise<X> =>
+  isThenable(v) ? await v : v;
 
 const isPageGenerator = (
   v: unknown,
@@ -194,14 +190,14 @@ async function mount<T extends PagesMap>(
   for (const route of ERROR_ROUTES) {
     if (!s.internalApps[route] && s.internalPages[route]) {
       const pageFn = s.internalPages[route]!;
-      const app = spawnInRoot(s, await resolve(pageFn({ getMessage: s.getErrorText }, s.std!), s.std));
+      const app = spawnInRoot(s, await resolve(pageFn({ getMessage: s.getErrorText }, s.std!)));
       s.std!.node.pause(app);
       s.internalApps[route] = app;
     }
   }
   if (!s.internalApps['@splash'] && s.internalPages['@splash']) {
     const pageFn = s.internalPages['@splash']!;
-    s.internalApps['@splash'] = spawnInRoot(s, await resolve(pageFn({}, s.std!), s.std));
+    s.internalApps['@splash'] = spawnInRoot(s, await resolve(pageFn({}, s.std!)));
   }
 
   if (s.unload_images) s.std!.image.unload_all();
@@ -242,7 +238,8 @@ async function mount<T extends PagesMap>(
       }
     }
   } else if (isThenable(result)) {
-    const el = await resolve(result, s.std);
+    const el = await result;
+    scheduleEnginePump(s.std);
     s.currentApp = spawnInRoot(s, el as JSX.Element);
     if (s.internalApps['@splash']) s.std!.node.pause(s.internalApps['@splash']!);
   } else {

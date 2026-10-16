@@ -79,27 +79,35 @@ function factoryRequest(getConfig: AcaiHttpGetConfigs, method: AcaiHttpMethod) {
 
             const toResponse = (s: GlyStdWithHttpResponse, ok: boolean) => {
                 const status = s.http.status ?? 0;
-                const raw = s.http.body as string;
+                const raw = s.http.body;
+                const textBody = typeof raw === "string" ? raw : "";
 
                 return {
                     ok, status,
-                    text: () => raw,
-                    json: <T>() => std.json?.decode(raw) as T,
+                    text: () => textBody,
+                    json: <T>() => {
+                        if (typeof raw === "string" && std.json?.decode) {
+                            return std.json.decode(raw) as T;
+                        }
+                        return raw as T;
+                    },
                 };
             };
 
             http
                 .success((s) => {
+                    const response = toResponse(s, true);
+                    resolve(response);
                     scheduleEnginePump(std);
-                    resolve(toResponse(s, true));
                 })
                 .failed((s) => {
+                    const response = toResponse(s, false);
+                    resolve(response);
                     scheduleEnginePump(std);
-                    resolve(toResponse(s, false));
                 })
                 .error((s) => {
-                    scheduleEnginePump(std);
                     reject(new Error(`Request error: ${method} ${fullUrl}\n${s.http.error}`));
+                    scheduleEnginePump(std);
                 })
                 .run();
         });
