@@ -114,13 +114,17 @@ class NotFoundError extends Error {
   }
 }
 
-const isThenable = (v: unknown): v is Promise<unknown> => {
-  const maybe = v as { then?: unknown };
-  return maybe != null && typeof maybe.then === 'function';
+/** TSTL __TS__Promise: `then` via prototype; also match addCallbacks+state (Fengari). */
+const isPromiseLike = (v: unknown): v is Promise<unknown> => {
+  if (v == null || typeof v !== 'object') return false;
+  const o = v as { then?: unknown; addCallbacks?: unknown; state?: unknown };
+  if (typeof o.then === 'function') return true;
+  if (typeof o.addCallbacks === 'function' && typeof o.state === 'number') return true;
+  return false;
 };
 
 const resolve = async <X>(v: X | Promise<X>): Promise<X> =>
-  isThenable(v) ? await v : v;
+  isPromiseLike(v) ? await v : v;
 
 const isPageGenerator = (
   v: unknown,
@@ -237,7 +241,7 @@ async function mount<T extends PagesMap>(
         mountStep(value as JSX.Element);
       }
     }
-  } else if (isThenable(result)) {
+  } else if (isPromiseLike(result)) {
     const el = await result;
     scheduleEnginePump(s.std);
     s.currentApp = spawnInRoot(s, el as JSX.Element);
@@ -278,6 +282,10 @@ async function runUnmount<T extends PagesMap>(
 
 function handleError<T extends PagesMap>(s: State<T>, err: unknown): void {
   s.errorText = String(err);
+  if (s.std?.log?.info) {
+    const msg = s.errorText.length > 240 ? `${s.errorText.slice(0, 240)}…` : s.errorText;
+    s.std.log.info(`[gly] router error ${msg}`);
+  }
 
   const route: AcaiRouterInternalString =
     err instanceof NotFoundError ? '@error/not-found' : '@error';
