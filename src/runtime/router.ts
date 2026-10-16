@@ -267,6 +267,9 @@ function mountPageResult<T extends PagesMap>(
       })
       .then(() => {
         scheduleEnginePump(s.std);
+      })
+      .catch((first: unknown, second?: unknown) => {
+        throw luaPromiseReason(first, second);
       });
   }
 
