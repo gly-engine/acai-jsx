@@ -1,4 +1,5 @@
 import { GlyStd, GlyStdWithHttpResponse } from "@gamely/gly-types";
+import { scheduleEnginePump } from "./pump";
 
 export type AcaiHttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
 
@@ -88,9 +89,18 @@ function factoryRequest(getConfig: AcaiHttpGetConfigs, method: AcaiHttpMethod) {
             };
 
             http
-                .success((s) => resolve(toResponse(s, true)))
-                .failed((s) => resolve(toResponse(s, false)))
-                .error((s) => reject(new Error(`Request error: ${method} ${fullUrl}\n${s.http.error}`)))
+                .success((s) => {
+                    scheduleEnginePump(std);
+                    resolve(toResponse(s, true));
+                })
+                .failed((s) => {
+                    scheduleEnginePump(std);
+                    resolve(toResponse(s, false));
+                })
+                .error((s) => {
+                    scheduleEnginePump(std);
+                    reject(new Error(`Request error: ${method} ${fullUrl}\n${s.http.error}`));
+                })
                 .run();
         });
     }

@@ -2,6 +2,7 @@
  * @todo revisar
  */
 import type { GlyStd } from "@gamely/gly-types";
+import { scheduleEnginePump } from "./pump";
 
 export type AcaiTimerHandle = number;
 
@@ -85,7 +86,10 @@ export function createTimer(): AcaiTimerWithSetConfig {
 
     const timer: AcaiTimer = {
         sleep: (ms) => new Promise<void>((resolve) => {
-            schedule(s, () => resolve(), ms);
+            schedule(s, () => {
+                scheduleEnginePump(s.std);
+                resolve();
+            }, ms);
         }),
         timeout: (fn, ms) => schedule(s, fn, ms),
         interval: (fn, ms) => schedule(s, fn, ms, ms),

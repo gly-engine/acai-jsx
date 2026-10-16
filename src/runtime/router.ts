@@ -1,4 +1,5 @@
 import type { GlyApp, GlyStd } from "@gamely/gly-types";
+import { scheduleEnginePump } from "./pump";
 
 export type AcaiRouterInternalString = '@error' | '@error/not-found' | '@splash';
 export type AcaiRouterString = `/${string}`;
@@ -118,8 +119,12 @@ const isThenable = (v: unknown): v is Promise<unknown> => {
   return maybe != null && typeof maybe.then === 'function';
 };
 
-const resolve = async <X>(v: X | Promise<X>): Promise<X> =>
-  isThenable(v) ? await v : v;
+const resolve = async <X>(v: X | Promise<X>, std?: GlyStd): Promise<X> => {
+  if (!isThenable(v)) return v;
+  const out = await v;
+  scheduleEnginePump(std);
+  return out;
+};
 
 const isPageGenerator = (
   v: unknown,
@@ -189,14 +194,14 @@ async function mount<T extends PagesMap>(
   for (const route of ERROR_ROUTES) {
     if (!s.internalApps[route] && s.internalPages[route]) {
       const pageFn = s.internalPages[route]!;
-      const app = spawnInRoot(s, await resolve(pageFn({ getMessage: s.getErrorText }, s.std!)));
+      const app = spawnInRoot(s, await resolve(pageFn({ getMessage: s.getErrorText }, s.std!), s.std));
       s.std!.node.pause(app);
       s.internalApps[route] = app;
     }
   }
   if (!s.internalApps['@splash'] && s.internalPages['@splash']) {
     const pageFn = s.internalPages['@splash']!;
-    s.internalApps['@splash'] = spawnInRoot(s, await resolve(pageFn({}, s.std!)));
+    s.internalApps['@splash'] = spawnInRoot(s, await resolve(pageFn({}, s.std!), s.std));
   }
 
   if (s.unload_images) s.std!.image.unload_all();
@@ -230,13 +235,14 @@ async function mount<T extends PagesMap>(
       const value = step.value;
       if (typeof value === 'function') {
         const ret = await value();
+        scheduleEnginePump(s.std);
         if (ret) mountStep(ret as JSX.Element);
       } else if (value) {
         mountStep(value as JSX.Element);
       }
     }
   } else if (isThenable(result)) {
-    const el = await result;
+    const el = await resolve(result, s.std);
     s.currentApp = spawnInRoot(s, el as JSX.Element);
     if (s.internalApps['@splash']) s.std!.node.pause(s.internalApps['@splash']!);
   } else {
@@ -265,6 +271,7 @@ async function runUnmount<T extends PagesMap>(
     const value = step.value;
     if (typeof value === 'function') {
       const ret = await value();
+      scheduleEnginePump(s.std);
       if (ret) swap(ret as JSX.Element);
     } else if (value) {
       swap(value as JSX.Element);
