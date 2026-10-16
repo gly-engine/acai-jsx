@@ -63,29 +63,18 @@ function factoryRequest(getConfig: AcaiHttpGetConfigs, method: AcaiHttpMethod) {
             throw new Error("Missing std in Acai Request!")
         }
 
-        return new Promise<AcaiHttpResponse>((resolve, reject) => {
-            /** Fengari/TSTL: reject(Error) vira tabela opaca; string propaga legível. */
-            const rejectMsg = (msg: string) => {
-                reject(msg);
-                scheduleEnginePump(std);
-            };
+        return new Promise<AcaiHttpResponse>((resolve) => {
             const base = base_url ? string.gsub(base_url, '\/$', '')[0] : '';
             const path = string.gsub(url, '^\/', '')[0];
             const fullUrl = base.length > 0? `${base}/${path}` : url;
 
-            const http = createRequest(std, fullUrl, method);
-
-            const headers = opts?.headers ? { ...base_headers, ...opts.headers } : base_headers;
-            for (const [k, v] of Object.entries(headers)) http.header(k, v);
-            for (const [k, v] of Object.entries(opts?.params ?? {})) http.param(k, v);
-
-            if (typeof opts?.body === 'string') http.body(opts.body);
-            if (typeof opts?.body === 'object') http.body(opts.body);
-
             const toResponse = (s: GlyStdWithHttpResponse, ok: boolean) => {
                 const status = s.http.status ?? 0;
                 const raw = s.http.body;
-                const textBody = typeof raw === "string" ? raw : "";
+                let textBody = typeof raw === "string" ? raw : "";
+                if (!ok && textBody.length === 0 && typeof s.http.error === "string" && s.http.error.length > 0) {
+                    textBody = s.http.error;
+                }
 
                 return {
                     ok, status,
@@ -99,22 +88,30 @@ function factoryRequest(getConfig: AcaiHttpGetConfigs, method: AcaiHttpMethod) {
                 };
             };
 
+            /** Fengari/TSTL: Promise.reject corrompe o motivo; sempre resolve + ok=false e deixa getJson lançar string. */
+            const finish = (s: GlyStdWithHttpResponse, ok: boolean) => {
+                const response = toResponse(s, ok);
+                if (std.log?.info) {
+                    const tail = fullUrl.length > 72 ? fullUrl.slice(-72) : fullUrl;
+                    std.log.info(`[gly] http ${ok ? "ok" : "fail"} ${response.status} ${tail}`);
+                }
+                resolve(response);
+                scheduleEnginePump(std);
+            };
+
+            const http = createRequest(std, fullUrl, method);
+
+            const headers = opts?.headers ? { ...base_headers, ...opts.headers } : base_headers;
+            for (const [k, v] of Object.entries(headers)) http.header(k, v);
+            for (const [k, v] of Object.entries(opts?.params ?? {})) http.param(k, v);
+
+            if (typeof opts?.body === 'string') http.body(opts.body);
+            if (typeof opts?.body === 'object') http.body(opts.body);
+
             http
-                .success((s) => {
-                    resolve(toResponse(s, true));
-                    scheduleEnginePump(std);
-                })
-                .failed((s) => {
-                    const response = toResponse(s, false);
-                    const detail =
-                        (typeof s.http.error === "string" && s.http.error.length > 0)
-                            ? s.http.error
-                            : response.text().slice(0, 120);
-                    rejectMsg(`HTTP ${response.status} ${method} ${fullUrl}\n${detail}`);
-                })
-                .error((s) => {
-                    rejectMsg(`Request error: ${method} ${fullUrl}\n${s.http.error}`);
-                })
+                .success((s) => finish(s, true))
+                .failed((s) => finish(s, false))
+                .error((s) => finish(s, false))
                 .run();
         });
     }
