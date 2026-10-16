@@ -325,9 +325,16 @@ async function runUnmount<T extends PagesMap>(
 }
 
 function formatRouterError(err: unknown): string {
+  if (typeof err === "string") return err;
   if (err instanceof Error) {
     const e = err as Error & { stack?: string };
     return e.stack && e.stack.length > 0 ? `${e.message}\n${e.stack}` : e.message;
+  }
+  if (typeof err === "object" && err !== null) {
+    const o = err as { message?: unknown; stack?: string };
+    if (typeof o.message === "string" && o.message.length > 0) {
+      return typeof o.stack === "string" && o.stack.length > 0 ? `${o.message}\n${o.stack}` : o.message;
+    }
   }
   return String(err);
 }

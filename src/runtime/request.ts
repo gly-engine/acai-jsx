@@ -64,6 +64,11 @@ function factoryRequest(getConfig: AcaiHttpGetConfigs, method: AcaiHttpMethod) {
         }
 
         return new Promise<AcaiHttpResponse>((resolve, reject) => {
+            /** Fengari/TSTL: reject(Error) vira tabela opaca; string propaga legível. */
+            const rejectMsg = (msg: string) => {
+                reject(msg);
+                scheduleEnginePump(std);
+            };
             const base = base_url ? string.gsub(base_url, '\/$', '')[0] : '';
             const path = string.gsub(url, '^\/', '')[0];
             const fullUrl = base.length > 0? `${base}/${path}` : url;
@@ -105,12 +110,10 @@ function factoryRequest(getConfig: AcaiHttpGetConfigs, method: AcaiHttpMethod) {
                         (typeof s.http.error === "string" && s.http.error.length > 0)
                             ? s.http.error
                             : response.text().slice(0, 120);
-                    reject(new Error(`HTTP ${response.status} ${method} ${fullUrl}\n${detail}`));
-                    scheduleEnginePump(std);
+                    rejectMsg(`HTTP ${response.status} ${method} ${fullUrl}\n${detail}`);
                 })
                 .error((s) => {
-                    reject(new Error(`Request error: ${method} ${fullUrl}\n${s.http.error}`));
-                    scheduleEnginePump(std);
+                    rejectMsg(`Request error: ${method} ${fullUrl}\n${s.http.error}`);
                 })
                 .run();
         });
