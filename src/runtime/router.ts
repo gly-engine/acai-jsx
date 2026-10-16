@@ -330,6 +330,7 @@ async function navigate<T extends PagesMap>(
         if (unmountFn) await runUnmount(s, unmountFn, currentEntry.params);
       }
       await mount(s, next, focus);
+      scheduleEnginePump(s.std);
     }
     s.busy = false;
   } catch (e) {
