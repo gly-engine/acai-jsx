@@ -324,6 +324,14 @@ async function runUnmount<T extends PagesMap>(
   }
 }
 
+/** TSTL Promise .catch: motivo real costuma vir no 2º arg (invokeCallbacks). */
+function luaPromiseReason(first: unknown, second?: unknown): unknown {
+  if (typeof second === "string") return second;
+  if (typeof first === "string") return first;
+  if (second !== undefined && second !== null) return second;
+  return first;
+}
+
 function formatRouterError(err: unknown): string {
   if (typeof err === "string") return err;
   if (err instanceof Error) {
@@ -413,8 +421,8 @@ function navigate<T extends PagesMap>(
         scheduleEnginePump(s.std);
         s.busy = false;
       })
-      .catch((e: unknown) => {
-        handleError(s, e);
+      .catch((first: unknown, second?: unknown) => {
+        handleError(s, luaPromiseReason(first, second));
         s.busy = false;
         scheduleEnginePump(s.std);
       });
@@ -425,8 +433,8 @@ function navigate<T extends PagesMap>(
       scheduleEnginePump(s.std);
       return runUnmount(s, unmountFn, currentEntry.params)
         .then(finishMount)
-        .catch((e: unknown) => {
-          handleError(s, e);
+        .catch((first: unknown, second?: unknown) => {
+          handleError(s, luaPromiseReason(first, second));
           s.busy = false;
           scheduleEnginePump(s.std);
         });
