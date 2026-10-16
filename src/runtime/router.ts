@@ -186,6 +186,9 @@ async function mount<T extends PagesMap>(
 ): Promise<void> {
   const fn = s.userPages[entry.path] as AcaiRouterPage<any> | undefined;
   if (!fn) throw new NotFoundError(entry.path);
+  if (s.std?.log?.info) {
+    s.std.log.info(`[gly] mount ${entry.path}`);
+  }
 
   // Pre-create error apps (paused) and splash app before running the page function,
   // so handleError can resume them synchronously without any async work.
@@ -194,14 +197,22 @@ async function mount<T extends PagesMap>(
   for (const route of ERROR_ROUTES) {
     if (!s.internalApps[route] && s.internalPages[route]) {
       const pageFn = s.internalPages[route]!;
-      const app = spawnInRoot(s, await resolve(pageFn({ getMessage: s.getErrorText }, s.std!)));
+      const raw = pageFn({ getMessage: s.getErrorText }, s.std!);
+      const el = isPromiseLike(raw)
+        ? ((await raw) as JSX.Element)
+        : (raw as JSX.Element);
+      const app = spawnInRoot(s, el);
       s.std!.node.pause(app);
       s.internalApps[route] = app;
     }
   }
   if (!s.internalApps['@splash'] && s.internalPages['@splash']) {
     const pageFn = s.internalPages['@splash']!;
-    s.internalApps['@splash'] = spawnInRoot(s, await resolve(pageFn({}, s.std!)));
+    const raw = pageFn({}, s.std!);
+    const el = isPromiseLike(raw)
+      ? ((await raw) as JSX.Element)
+      : (raw as JSX.Element);
+    s.internalApps['@splash'] = spawnInRoot(s, el);
   }
 
   if (s.unload_images) s.std!.image.unload_all();
@@ -213,6 +224,7 @@ async function mount<T extends PagesMap>(
   }
 
   const result = fn(entry.params, s.std!);
+  scheduleEnginePump(s.std);
 
   if (isPageGenerator(result)) {
     let firstMount = true;
