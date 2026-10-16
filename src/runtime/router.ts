@@ -277,6 +277,8 @@ function mountPageResult<T extends PagesMap>(
   if (s.internalApps['@splash']) s.std!.node.pause(s.internalApps['@splash']!);
   applyFocus(s, entry, focus);
   scheduleEnginePump(s.std);
+  /** Fengari: finishMount().then(…) pode nunca rodar; senão isRouterBusy() bloqueia teclas. */
+  s.busy = false;
   return Promise.resolve();
 }
 
