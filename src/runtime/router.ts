@@ -294,12 +294,9 @@ function mount<T extends PagesMap>(
   }
 
   scheduleEnginePump(s.std);
-  return Promise.resolve().then(() => {
-    scheduleEnginePump(s.std);
-    const result = fn(entry.params, s.std!);
-    scheduleEnginePump(s.std);
-    return mountPageResult(s, result, entry, focus);
-  });
+  const result = fn(entry.params, s.std!);
+  scheduleEnginePump(s.std);
+  return mountPageResult(s, result, entry, focus);
 }
 
 async function runUnmount<T extends PagesMap>(
