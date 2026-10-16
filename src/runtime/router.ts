@@ -179,29 +179,15 @@ function rememberFocus<T extends PagesMap>(s: State<T>): void {
   top.focusedId = s.std.ui.queryOne('focused')?.getId();
 }
 
-async function mount<T extends PagesMap>(
-  s: State<T>,
-  entry: Entry<T>,
-  focus: FocusTargetMemo[],
-): Promise<void> {
-  const fn = s.userPages[entry.path] as AcaiRouterPage<any> | undefined;
-  if (!fn) throw new NotFoundError(entry.path);
-  if (s.std?.log?.info) {
-    s.std.log.info(`[gly] mount ${entry.path}`);
-  }
-
-  // Pre-create error apps (paused) and splash app before running the page function,
-  // so handleError can resume them synchronously without any async work.
-  // Spawned under rootApp (never under engine.current): a page-relative parent
-  // would die together with the page and leave stale refs in internalApps.
+function mountPreloadInternalApps<T extends PagesMap>(s: State<T>): void {
   for (const route of ERROR_ROUTES) {
     if (!s.internalApps[route] && s.internalPages[route]) {
       const pageFn = s.internalPages[route]!;
       const raw = pageFn({ getMessage: s.getErrorText }, s.std!);
-      const el = isPromiseLike(raw)
-        ? ((await raw) as JSX.Element)
-        : (raw as JSX.Element);
-      const app = spawnInRoot(s, el);
+      if (isPromiseLike(raw)) {
+        throw new Error('Internal router page must be sync JSX: ' + route);
+      }
+      const app = spawnInRoot(s, raw as JSX.Element);
       s.std!.node.pause(app);
       s.internalApps[route] = app;
     }
@@ -209,62 +195,99 @@ async function mount<T extends PagesMap>(
   if (!s.internalApps['@splash'] && s.internalPages['@splash']) {
     const pageFn = s.internalPages['@splash']!;
     const raw = pageFn({}, s.std!);
-    const el = isPromiseLike(raw)
-      ? ((await raw) as JSX.Element)
-      : (raw as JSX.Element);
-    s.internalApps['@splash'] = spawnInRoot(s, el);
+    if (isPromiseLike(raw)) {
+      throw new Error('Internal router page must be sync JSX: @splash');
+    }
+    s.internalApps['@splash'] = spawnInRoot(s, raw as JSX.Element);
   }
+}
 
+function mountShowSplash<T extends PagesMap>(s: State<T>): void {
   if (s.unload_images) s.std!.image.unload_all();
   killCurrent(s);
-
   if (s.internalApps['@splash']) s.std!.node.resume(s.internalApps['@splash']!);
   for (const route of ERROR_ROUTES) {
     if (s.internalApps[route]) s.std!.node.pause(s.internalApps[route]!);
+  }
+}
+
+async function mountPageGenerator<T extends PagesMap>(
+  s: State<T>,
+  result: Generator<AcaiRouterPageStep, JSX.Element | void, void>,
+  entry: Entry<T>,
+  focus: FocusTargetMemo[],
+): Promise<void> {
+  let firstMount = true;
+  const mountStep = (el: JSX.Element): void => {
+    const prev = s.currentApp;
+    s.currentApp = spawnInRoot(s, el);
+    if (prev) s.std!.node.kill(prev);
+    if (firstMount) {
+      if (s.internalApps['@splash']) s.std!.node.pause(s.internalApps['@splash']!);
+      firstMount = false;
+    }
+  };
+
+  while (true) {
+    const step = result.next();
+    if (step.done) {
+      if (step.value) mountStep(step.value as JSX.Element);
+      break;
+    }
+    const value = step.value;
+    if (typeof value === 'function') {
+      const ret = await value();
+      scheduleEnginePump(s.std);
+      if (ret) mountStep(ret as JSX.Element);
+    } else if (value) {
+      mountStep(value as JSX.Element);
+    }
+  }
+  applyFocus(s, entry, focus);
+}
+
+/** Sync shell + `.then` for page async — Fengari: outer `async function mount` never ran on the same tick. */
+function mount<T extends PagesMap>(
+  s: State<T>,
+  entry: Entry<T>,
+  focus: FocusTargetMemo[],
+): Promise<void> {
+  const fn = s.userPages[entry.path] as AcaiRouterPage<any> | undefined;
+  if (!fn) return Promise.reject(new NotFoundError(entry.path));
+
+  try {
+    mountPreloadInternalApps(s);
+    mountShowSplash(s);
+  } catch (e) {
+    return Promise.reject(e);
   }
 
   const result = fn(entry.params, s.std!);
   scheduleEnginePump(s.std);
 
   if (isPageGenerator(result)) {
-    let firstMount = true;
-    const mountStep = (el: JSX.Element): void => {
-      const prev = s.currentApp;
-      s.currentApp = spawnInRoot(s, el);
-      if (prev) s.std!.node.kill(prev);
-      if (firstMount) {
-        if (s.internalApps['@splash']) s.std!.node.pause(s.internalApps['@splash']!);
-        firstMount = false;
-      }
-    };
-
-    while (true) {
-      const step = result.next();
-      if (step.done) {
-        if (step.value) mountStep(step.value as JSX.Element);
-        break;
-      }
-      const value = step.value;
-      if (typeof value === 'function') {
-        const ret = await value();
-        scheduleEnginePump(s.std);
-        if (ret) mountStep(ret as JSX.Element);
-      } else if (value) {
-        mountStep(value as JSX.Element);
-      }
-    }
-  } else if (isPromiseLike(result)) {
-    const el = await result;
-    scheduleEnginePump(s.std);
-    s.currentApp = spawnInRoot(s, el as JSX.Element);
-    if (s.internalApps['@splash']) s.std!.node.pause(s.internalApps['@splash']!);
-  } else {
-    const el = result as JSX.Element;
-    s.currentApp = spawnInRoot(s, el);
-    if (s.internalApps['@splash']) s.std!.node.pause(s.internalApps['@splash']!);
+    return mountPageGenerator(s, result, entry, focus).then(() => {
+      scheduleEnginePump(s.std);
+    });
   }
 
+  if (isPromiseLike(result)) {
+    return (result as Promise<JSX.Element>)
+      .then((el) => {
+        s.currentApp = spawnInRoot(s, el);
+        if (s.internalApps['@splash']) s.std!.node.pause(s.internalApps['@splash']!);
+        applyFocus(s, entry, focus);
+      })
+      .then(() => {
+        scheduleEnginePump(s.std);
+      });
+  }
+
+  s.currentApp = spawnInRoot(s, result as JSX.Element);
+  if (s.internalApps['@splash']) s.std!.node.pause(s.internalApps['@splash']!);
   applyFocus(s, entry, focus);
+  scheduleEnginePump(s.std);
+  return Promise.resolve();
 }
 
 async function runUnmount<T extends PagesMap>(
@@ -292,10 +315,18 @@ async function runUnmount<T extends PagesMap>(
   }
 }
 
+function formatRouterError(err: unknown): string {
+  if (err instanceof Error) {
+    const e = err as Error & { stack?: string };
+    return e.stack && e.stack.length > 0 ? `${e.message}\n${e.stack}` : e.message;
+  }
+  return String(err);
+}
+
 function handleError<T extends PagesMap>(s: State<T>, err: unknown): void {
-  s.errorText = String(err);
+  s.errorText = formatRouterError(err);
   if (s.std?.log?.info) {
-    const msg = s.errorText.length > 240 ? `${s.errorText.slice(0, 240)}…` : s.errorText;
+    const msg = s.errorText.length > 480 ? `${s.errorText.slice(0, 480)}…` : s.errorText;
     s.std.log.info(`[gly] router error ${msg}`);
   }
 
