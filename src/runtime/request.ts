@@ -96,13 +96,16 @@ function factoryRequest(getConfig: AcaiHttpGetConfigs, method: AcaiHttpMethod) {
 
             http
                 .success((s) => {
-                    const response = toResponse(s, true);
-                    resolve(response);
+                    resolve(toResponse(s, true));
                     scheduleEnginePump(std);
                 })
                 .failed((s) => {
                     const response = toResponse(s, false);
-                    resolve(response);
+                    const detail =
+                        (typeof s.http.error === "string" && s.http.error.length > 0)
+                            ? s.http.error
+                            : response.text().slice(0, 120);
+                    reject(new Error(`HTTP ${response.status} ${method} ${fullUrl}\n${detail}`));
                     scheduleEnginePump(std);
                 })
                 .error((s) => {
