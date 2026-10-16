@@ -315,25 +315,26 @@ function handleError<T extends PagesMap>(s: State<T>, err: unknown): void {
   }
 }
 
-async function navigate<T extends PagesMap>(
+/** Sync entry + `.then` chains — Fengari often never runs outer `async function` executors on the same tick. */
+function navigate<T extends PagesMap>(
   s: State<T>,
   peek: () => Entry<T> | undefined,
   commit: (entry: Entry<T>) => Entry<T>,
   focus: FocusTargetMemo[],
   targetPath?: string,
 ): Promise<void> {
-  if (s.lock) return;
+  if (s.lock) return Promise.resolve();
   if (s.interrupt === 'block' && s.busy) {
     if (s.std?.log?.info) s.std.log.info('[gly] nav skipped (busy)');
-    return;
+    return Promise.resolve();
   }
   if (targetPath !== undefined) {
     const top = s.stack[s.stack.length - 1];
     if (top && top.path === targetPath) {
-      if (s.same_page === 'block') return;
+      if (s.same_page === 'block') return Promise.resolve();
       if (s.same_page === 'refocus') {
         applyFocus(s, top, focus);
-        return;
+        return Promise.resolve();
       }
       // 'reload' falls through to a full unmount/mount cycle below.
     }
@@ -342,27 +343,51 @@ async function navigate<T extends PagesMap>(
   if (s.std?.log?.info && targetPath !== undefined) {
     s.std.log.info(`[gly] nav ${targetPath}`);
   }
-  try {
-    rememberFocus(s);
-    const currentEntry = s.stack[s.stack.length - 1];
-    // Validate the destination BEFORE touching the stack or running the
-    // outgoing page's unmount — an invalid target must not destroy anything.
-    const candidate = peek();
-    if (candidate) {
-      if (!s.userPages[candidate.path]) throw new NotFoundError(candidate.path);
-      const next = commit(candidate);
-      if (currentEntry) {
-        const unmountFn = s.userUnmounts[currentEntry.path];
-        if (unmountFn) await runUnmount(s, unmountFn, currentEntry.params);
-      }
-      await mount(s, next, focus);
-      scheduleEnginePump(s.std);
-    }
+
+  rememberFocus(s);
+  const currentEntry = s.stack[s.stack.length - 1];
+  const candidate = peek();
+  if (!candidate) {
     s.busy = false;
-  } catch (e) {
-    handleError(s, e);
-    s.busy = false;
+    return Promise.resolve();
   }
+
+  if (!s.userPages[candidate.path]) {
+    handleError(s, new NotFoundError(candidate.path));
+    s.busy = false;
+    return Promise.resolve();
+  }
+
+  const next = commit(candidate);
+
+  const finishMount = (): Promise<void> =>
+    mount(s, next, focus)
+      .then(() => {
+        scheduleEnginePump(s.std);
+        s.busy = false;
+      })
+      .catch((e: unknown) => {
+        handleError(s, e);
+        s.busy = false;
+        scheduleEnginePump(s.std);
+      });
+
+  if (currentEntry) {
+    const unmountFn = s.userUnmounts[currentEntry.path];
+    if (unmountFn) {
+      scheduleEnginePump(s.std);
+      return runUnmount(s, unmountFn, currentEntry.params)
+        .then(finishMount)
+        .catch((e: unknown) => {
+          handleError(s, e);
+          s.busy = false;
+          scheduleEnginePump(s.std);
+        });
+    }
+  }
+
+  scheduleEnginePump(s.std);
+  return finishMount();
 }
 
 function go<T extends PagesMap, K extends PagePath<T>>(
