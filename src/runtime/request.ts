@@ -88,11 +88,8 @@ function factoryRequest(getConfig: AcaiHttpGetConfigs, method: AcaiHttpMethod) {
                 };
             };
 
-            /** Fengari/TSTL: Promise.reject corrompe o motivo; sempre resolve + ok=false e deixa getJson lançar string. */
             const finish = (s: GlyStdWithHttpResponse, ok: boolean) => {
-                const response = toResponse(s, ok);
-                /** Fengari: std.log dentro do callback HTTP quebra coroutine async (TSTL). */
-                resolve(response);
+                resolve(toResponse(s, ok));
                 scheduleEnginePump(std);
             };
 

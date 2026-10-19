@@ -114,7 +114,6 @@ class NotFoundError extends Error {
   }
 }
 
-/** TSTL __TS__Promise: `then` via prototype; also match addCallbacks+state (Fengari). */
 const isPromiseLike = (v: unknown): v is Promise<unknown> => {
   if (v == null || typeof v !== 'object') return false;
   const o = v as { then?: unknown; addCallbacks?: unknown; state?: unknown };
@@ -279,12 +278,10 @@ function mountPageResult<T extends PagesMap>(
   if (s.internalApps['@splash']) s.std!.node.pause(s.internalApps['@splash']!);
   applyFocus(s, entry, focus);
   scheduleEnginePump(s.std);
-  /** Fengari: finishMount().then(…) pode nunca rodar; senão isRouterBusy() bloqueia teclas. */
   s.busy = false;
   return Promise.resolve();
 }
 
-/** Sync shell; page fn on next promise tick so Fengari XHR can finish across frames. */
 function mount<T extends PagesMap>(
   s: State<T>,
   entry: Entry<T>,
@@ -331,7 +328,6 @@ async function runUnmount<T extends PagesMap>(
   }
 }
 
-/** TSTL Promise .catch: motivo real costuma vir no 2º arg (invokeCallbacks). */
 function luaPromiseReason(first: unknown, second?: unknown): unknown {
   if (typeof second === "string") return second;
   if (typeof first === "string") return first;
@@ -356,10 +352,6 @@ function formatRouterError(err: unknown): string {
 
 function handleError<T extends PagesMap>(s: State<T>, err: unknown): void {
   s.errorText = formatRouterError(err);
-  if (s.std?.log?.info) {
-    const msg = s.errorText.length > 480 ? `${s.errorText.slice(0, 480)}…` : s.errorText;
-    s.std.log.info(`[gly] router error ${msg}`);
-  }
 
   const route: AcaiRouterInternalString =
     err instanceof NotFoundError ? '@error/not-found' : '@error';
@@ -377,7 +369,6 @@ function handleError<T extends PagesMap>(s: State<T>, err: unknown): void {
   }
 }
 
-/** Sync entry + `.then` chains — Fengari often never runs outer `async function` executors on the same tick. */
 function navigate<T extends PagesMap>(
   s: State<T>,
   peek: () => Entry<T> | undefined,
@@ -387,7 +378,6 @@ function navigate<T extends PagesMap>(
 ): Promise<void> {
   if (s.lock) return Promise.resolve();
   if (s.interrupt === 'block' && s.busy) {
-    if (s.std?.log?.info) s.std.log.info('[gly] nav skipped (busy)');
     return Promise.resolve();
   }
   if (targetPath !== undefined) {
@@ -402,9 +392,6 @@ function navigate<T extends PagesMap>(
     }
   }
   s.busy = true;
-  if (s.std?.log?.info && targetPath !== undefined) {
-    s.std.log.info(`[gly] nav ${targetPath}`);
-  }
 
   rememberFocus(s);
   const currentEntry = s.stack[s.stack.length - 1];
@@ -455,7 +442,6 @@ function navigate<T extends PagesMap>(
 function go<T extends PagesMap, K extends PagePath<T>>(
   s: State<T>, path: K, params: PageProps<T, K>,
 ): Promise<void> {
-  if (s.std?.log?.info) s.std.log.info(`[gly] nav go ${path}`);
   return navigate(s, () => ({ path, params: params as PageParams }), (entry) => {
     const i = s.stack.findIndex(e => e.path === entry.path);
     if (i >= 0) {
