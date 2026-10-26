@@ -81,7 +81,7 @@ export function AcaiGenerateTextTokens(
   av: "top" | "middle" | "bottom"
 ) {
   const tokens: AcaiTextToken[] = [];
-  const words = text.split(" ");
+  const words = text.split("\n").join(" \n ").split(" ").filter((word) => word !== "");
   const [spaceSize] = std.text.mensure(" ");
   let y = 0;
 
@@ -164,7 +164,8 @@ export function AcaiGenerateTextTokens(
     const [w] = std.text.mensure(words[i]);
     const h = lh;
 
-    const nextLineOverflow = lineWidth > 0 && lineWidth + spaceSize + w > width;
+    const lineBreak = words[i] === "\n";
+    const nextLineOverflow = lineBreak || (lineWidth > 0 && lineWidth + spaceSize + w > width);
 
     if (nextLineOverflow) {
       const nextY = y + lh;
@@ -177,6 +178,8 @@ export function AcaiGenerateTextTokens(
 
       commitLine(false);
     }
+
+    if (lineBreak) continue;
 
     lineWords.push({ word: words[i], width: w, height: h });
     lineWidth += (lineWidth > 0 ? spaceSize : 0) + w;
