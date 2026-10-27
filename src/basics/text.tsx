@@ -81,7 +81,13 @@ export function AcaiGenerateTextTokens(
   av: "top" | "middle" | "bottom"
 ) {
   const tokens: AcaiTextToken[] = [];
-  const words = text.split("\n").join(" \n ").split(" ").filter((word) => word !== "");
+  const words = text
+    .split("\r\n").join("\n")
+    .split("\n\r").join("\n")
+    .split("\r").join("\n")
+    .split("\n").join(" \n ")
+    .split(" ")
+    .filter((word) => word !== "");
   const [spaceSize] = std.text.mensure(" ");
   let y = 0;
 
@@ -89,8 +95,14 @@ export function AcaiGenerateTextTokens(
   let lineWidth = 0;
   const lines: AcaiTextToken[][] = [];
 
-  function commitLine(isLast: boolean) {
-    if (lineWords.length === 0) return;
+  function commitLine(isLast: boolean, hardBreak = false) {
+    if (lineWords.length === 0) {
+      if (hardBreak) {
+        lines.push([]);
+        y += lh;
+      }
+      return;
+    }
 
     const lineTokens: AcaiTextToken[] = [];
     let offsetX = 0;
@@ -128,7 +140,7 @@ export function AcaiGenerateTextTokens(
     const dots = "...";
     const [w] = std.text.mensure(dots);
     const lastLine = lines.at(-1);
-    if (!lastLine) return;
+    if (!lastLine || lastLine.length === 0) return;
 
     const last = lastLine[lastLine.length - 1];
     const oldWidth = last.w;
@@ -176,7 +188,7 @@ export function AcaiGenerateTextTokens(
         return lines.flat();
       }
 
-      commitLine(false);
+      commitLine(lineBreak, lineBreak);
     }
 
     if (lineBreak) continue;
